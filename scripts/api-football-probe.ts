@@ -9,16 +9,15 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-const BASE = "https://v3.football.api-sports.io";
+import {
+	type ApiResult,
+	createClient,
+	errorsText,
+} from "../src/import/api-football/client";
+
 const OUT_DIR = join(".data", "api-football", "probe");
 
 type Json = Record<string, unknown>;
-type ApiResult = {
-	response: unknown;
-	errors: unknown;
-	paging?: { current: number; total: number };
-	results?: number;
-};
 
 function arg(name: string, fallback?: string): string | undefined {
 	const i = process.argv.indexOf(`--${name}`);
@@ -33,31 +32,14 @@ if (!key) {
 
 const league = Number(arg("league", "39"));
 const maxRequests = Number(arg("max-requests", "8"));
-let spent = 0;
-let remainingHeader: string | null = null;
+const client = createClient({ apiKey: key, maxRequests });
 
+// Probe tolerates API-level `errors` (prints them and carries on), and keeps every raw response.
 async function get(
 	path: string,
-	params: Record<string, string | number>,
-	free = false,
+	params: Record<string, string | number> = {},
 ): Promise<ApiResult> {
-	if (!free && spent >= maxRequests) {
-		throw new Error(`Request budget (${maxRequests}) exhausted before ${path}`);
-	}
-	const url = new URL(path, BASE);
-	for (const [k, v] of Object.entries(params))
-		url.searchParams.set(k, String(v));
-	const res = await fetch(url, {
-		headers: { "x-apisports-key": key as string },
-	});
-	if (!free) spent++;
-	remainingHeader =
-		res.headers.get("x-ratelimit-requests-remaining") ?? remainingHeader;
-	if (!res.ok)
-		throw new Error(
-			`${path} -> HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`,
-		);
-	const body = (await res.json()) as ApiResult;
+	const body = await client.get(path, params, { tolerateApiErrors: true });
 	const file = `${path.replaceAll("/", "_").replace(/^_/, "")}${
 		Object.keys(params).length
 			? `__${new URLSearchParams(params as Record<string, string>)}`
@@ -68,10 +50,7 @@ async function get(
 }
 
 function errorsOf(r: ApiResult): string {
-	const e = r.errors;
-	if (!e || (Array.isArray(e) && e.length === 0)) return "";
-	if (typeof e === "object" && Object.keys(e).length === 0) return "";
-	return JSON.stringify(e).slice(0, 300);
+	return errorsText(r.errors);
 }
 
 function pct(n: number, d: number): string {
@@ -91,7 +70,7 @@ async function main(): Promise<void> {
 	await mkdir(OUT_DIR, { recursive: true });
 
 	// ad 1. Account and quota (free call).
-	const status = await get("/status", {}, true);
+	const status = await get("/status");
 	const sub = dig(status.response, "subscription") as Json | undefined;
 	const req = dig(status.response, "requests") as Json | undefined;
 	console.log(
@@ -195,14 +174,14 @@ function summary(season: number, playerPages?: number, teamCount = 20): void {
 	const est =
 		playerPages === undefined ? "n/a" : 1 + 1 + teamCount + playerPages;
 	console.log(
-		`7. season=${season} requests spent=${spent} remaining(header)=${remainingHeader ?? "n/a"} est. full import = teams 1 + fixtures 1 + squads ${teamCount} + player pages ${playerPages ?? "?"} = ${est}`,
+		`7. season=${season} requests spent=${client.spent} remaining(header)=${client.remaining ?? "n/a"} est. full import = teams 1 + fixtures 1 + squads ${teamCount} + player pages ${playerPages ?? "?"} = ${est}`,
 	);
 	console.log(`   raw JSON: ${OUT_DIR}/`);
 }
 
 main().catch((e: unknown) => {
 	console.error(
-		`probe failed: ${e instanceof Error ? e.message : String(e)} (requests spent=${spent})`,
+		`probe failed: ${e instanceof Error ? e.message : String(e)} (requests spent=${client.spent})`,
 	);
 	process.exit(1);
 });
