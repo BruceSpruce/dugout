@@ -8,5 +8,5 @@ export default {
 	dbCredentials: {
 		url: env.DATABASE_URL,
 	},
-	tablesFilter: [".bootstrap-scaffold_*"],
+	tablesFilter: ["dugout_*"],
 } satisfies Config;
