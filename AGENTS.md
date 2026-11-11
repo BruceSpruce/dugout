@@ -29,7 +29,7 @@ Dugout is a single-user, offline Premier League football manager game. Stack: T3
 
 ## Coding Style
 
-- Biome (@biome.jsonc) enforces formatting (tabs), import sorting and Tailwind class order; `context/` is excluded from Biome.
+- Biome (@biome.jsonc) enforces formatting (tabs), import sorting and Tailwind class order; `context/` and generated `drizzle/` are excluded from Biome.
 - Import from `src` via the `~/` alias (@tsconfig.json). `noUncheckedIndexedAccess` is on — handle `undefined` from index access.
 - Every table is created through `createTable`, so names carry the `dugout_` prefix; `drizzle.config.ts` filters on it.
 
