@@ -1,0 +1,1 @@
+-- Baseline: migrations replace db:push from here on (T3 example table dugout_post dropped manually).
