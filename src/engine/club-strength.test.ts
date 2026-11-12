@@ -214,4 +214,27 @@ describe("compareStrengthToTable", () => {
 		expect(reversed.rho).toBeCloseTo(-1, 10);
 		expect(reversed.top6Hits).toBe(4);
 	});
+
+	it("breaks strength ties by name, not by table position", () => {
+		// "H" (8th) and "A" (1st) tie for 6th place in strength: by name "A" takes it,
+		// so the 6th slot does not depend on the table being checked.
+		const strengths = [
+			{ clubId: 2, strength: 80 },
+			{ clubId: 3, strength: 79 },
+			{ clubId: 4, strength: 78 },
+			{ clubId: 5, strength: 77 },
+			{ clubId: 6, strength: 76 },
+			{ clubId: 8, strength: 70 },
+			{ clubId: 1, strength: 70 },
+			{ clubId: 7, strength: 10 },
+		];
+		const byName = compareStrengthToTable(strengths, table);
+		expect(byName.rows[5]?.name).toBe("A");
+		const renamed = table.map((t) =>
+			t.clubId === 1 ? { ...t, name: "Z" } : t,
+		);
+		const c = compareStrengthToTable(strengths, renamed);
+		expect(c.rows[5]?.name).toBe("H");
+		expect(c.top6Hits).toBe(5);
+	});
 });

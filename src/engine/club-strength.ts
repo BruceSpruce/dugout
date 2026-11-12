@@ -171,7 +171,10 @@ export function compareStrengthToTable(
 	const joined = strengths
 		.map((s) => ({ s, t: tableById.get(s.clubId) }))
 		.filter((x): x is { s: (typeof strengths)[number]; t: TableRow } => !!x.t)
-		.sort((a, b) => b.s.strength - a.s.strength || a.t.position - b.t.position);
+		// Ties broken by name, never by table position: that would leak the result being checked.
+		.sort(
+			(a, b) => b.s.strength - a.s.strength || a.t.name.localeCompare(b.t.name),
+		);
 	const rows = joined.map(({ s, t }, i) => ({
 		clubId: s.clubId,
 		name: t.name,
