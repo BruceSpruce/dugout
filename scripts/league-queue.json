@@ -1,0 +1,10 @@
+[
+	{ "league": 39, "season": 2024, "name": "Premier League", "load": true },
+	{ "league": 140, "season": 2024, "name": "La Liga", "load": false },
+	{ "league": 78, "season": 2024, "name": "Bundesliga", "load": false },
+	{ "league": 135, "season": 2024, "name": "Serie A", "load": false },
+	{ "league": 61, "season": 2024, "name": "Ligue 1", "load": false },
+	{ "league": 88, "season": 2024, "name": "Eredivisie", "load": false },
+	{ "league": 94, "season": 2024, "name": "Primeira Liga", "load": false },
+	{ "league": 40, "season": 2024, "name": "Championship", "load": false }
+]

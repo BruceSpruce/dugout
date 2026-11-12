@@ -1,0 +1,14 @@
+{
+	"hooks": {
+		"SessionStart": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "f=\"$CLAUDE_PROJECT_DIR/.data/api-football/daily-status.txt\"; [ -f \"$f\" ] && echo \"Dugout daily download status: $(cat \"$f\")\" || true"
+					}
+				]
+			}
+		]
+	}
+}

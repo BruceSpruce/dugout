@@ -1,0 +1,12 @@
+# Runs right after the Free quota resets (00:00 UTC). Persistent=true runs a missed day's job
+# at the next boot/login, e.g. when the computer is switched on at 8:00.
+[Unit]
+Description=Dugout daily league download timer
+
+[Timer]
+OnCalendar=*-*-* 00:15:00 UTC
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target
