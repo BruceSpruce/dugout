@@ -12,6 +12,7 @@ Dugout is a single-user, offline Premier League football manager game. Stack: T3
 ## Project Structure
 
 - `src/app/` — Next.js routes; put route-local client components in `_components/`.
+- `src/engine/` — pure match/season engine (attributes, club strength, report); framework-free, see Hard Rules.
 - `src/server/api/` — tRPC: routers in `routers/`, registered in @src/server/api/root.ts.
 - `src/server/db/` — Drizzle schema (@src/server/db/schema.ts) and client.
 - `src/trpc/` — client/server tRPC helpers.
@@ -21,6 +22,7 @@ Dugout is a single-user, offline Premier League football manager game. Stack: T3
 ## Commands
 
 - `./start-database.sh` — start the `dugout-postgres` container (Docker, `postgres:18`).
+- `npm run attributes:report -- --league 39 --season 2024 [--club <name>]` — player attributes and club strength vs. the final table (needs a loaded season).
 - `npm run dev` — dev server (Turbopack).
 - `npm run db:generate` then `npm run db:migrate` — the only way to change the schema; SQL migrations in `drizzle/` are committed. Do not use `db:push`.
 - `npx tsx scripts/<name>.ts` — run CLI scripts that import from `src/` (`tsx` resolves the `~/` alias; plain `node` does not).
