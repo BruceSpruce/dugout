@@ -16,6 +16,8 @@
 		"preview": "next build && next start",
 		"import:fetch": "tsx --env-file=.env scripts/import-fetch.ts",
 		"import:load": "tsx --env-file=.env scripts/import-load.ts",
+		"import:report": "tsx --env-file=.env scripts/import-report.ts",
+		"import:season": "tsx --env-file=.env scripts/import-season.ts",
 		"probe:api-football": "tsx --env-file=.env scripts/api-football-probe.ts",
 		"start": "next start",
 		"test": "vitest run",
