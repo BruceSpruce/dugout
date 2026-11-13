@@ -263,20 +263,27 @@ describe("determinizm", () => {
 		expect(run(7)).toEqual(run(7));
 		expect(run(7)).not.toEqual(run(8));
 
-		let calls = 0;
-		const counting: Rng = () => {
-			calls++;
-			return 0.5;
-		};
-		matchEvents(player(50), freshState(), 1, counting);
-		expect(calls).toBe(6);
-		calls = 0;
-		matchEvents(player(50), freshState(), 1, scripted(STRAIGHT));
-		const rngAll = scripted(YELLOW);
-		matchEvents(player(50), freshState(), 1, () => {
-			calls++;
-			return rngAll();
-		});
-		expect(calls).toBe(6);
+		const NONE = [0.99, 0.99, 0.99, 0.99, 0, 0];
+		const INJURY = [0.99, 0.99, 0.99, 0, 0, 0];
+		const scenarios: [string, number[] | undefined][] = [
+			["brak zdarzen", NONE],
+			["zolta", YELLOW],
+			["druga zolta", SECOND_YELLOW],
+			["czerwona wprost", STRAIGHT],
+			["kontuzja", INJURY],
+			["rng stale 0.5", undefined],
+		];
+		for (const [label, values] of scenarios) {
+			let calls = 0;
+			const inner = values ? scripted(values) : () => 0.5;
+			const counting: Rng = () => {
+				calls++;
+				return inner();
+			};
+			const e = matchEvents(player(50), freshState(), 1, counting);
+			expect(calls, label).toBe(6);
+			if (label === "kontuzja") expect(e.injured).toBeGreaterThan(0);
+			if (label === "czerwona wprost") expect(e.red).toBe("straight");
+		}
 	});
 });

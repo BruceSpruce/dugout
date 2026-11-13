@@ -8,6 +8,7 @@ import {
 	type LineupPicker,
 	leagueStats,
 	lineupEffect,
+	matchStrength,
 	pickBestEleven,
 	reserveEleven,
 	type SeasonFixture,
@@ -54,16 +55,31 @@ const squadOf = (
 	]);
 };
 
+/** Double round-robin by the circle method (even club count): every club plays exactly once per round. */
 const doubleRoundRobin = (ids: number[]): SeasonFixture[] => {
-	const fixtures: SeasonFixture[] = [];
-	let round = 1;
-	for (const h of ids) {
-		for (const a of ids) {
-			if (h !== a)
-				fixtures.push({ round: round++, homeClubId: h, awayClubId: a });
+	const n = ids.length;
+	const first: SeasonFixture[] = [];
+	const rest = ids.slice(1);
+	for (let r = 0; r < n - 1; r++) {
+		const arr = [ids[0] as number, ...rest];
+		for (let i = 0; i < n / 2; i++) {
+			const x = arr[i] as number;
+			const y = arr[n - 1 - i] as number;
+			const flip = (r + i) % 2 === 1;
+			first.push({
+				round: r + 1,
+				homeClubId: flip ? y : x,
+				awayClubId: flip ? x : y,
+			});
 		}
+		rest.unshift(rest.pop() as number);
 	}
-	return fixtures;
+	const second = first.map((f) => ({
+		round: f.round + n - 1,
+		homeClubId: f.awayClubId,
+		awayClubId: f.homeClubId,
+	}));
+	return [...first, ...second];
 };
 
 const fourClubs = () => {
@@ -147,17 +163,17 @@ describe("simulateSeason / simulateSeasons", () => {
 	it("keeps input order within a round and gives missing squads strength 0", () => {
 		const fixtures: SeasonFixture[] = [
 			{ round: 2, homeClubId: 1, awayClubId: 2 },
+			{ round: 1, homeClubId: 4, awayClubId: 3 },
 			{ round: 1, homeClubId: 2, awayClubId: 1 },
-			{ round: 1, homeClubId: 1, awayClubId: 2 },
 		];
 		const squads = new Map([[1, squadOf(1, 70)]]);
 		const results = simulateSeason(fixtures, squads, createRng(3));
-		expect(results.map((r) => r.homeClubId)).toEqual([2, 1, 1]);
+		expect(results.map((r) => r.homeClubId)).toEqual([4, 2, 1]);
 	});
 
 	it("a club missing from squads has strength 0 and loses to a full squad", () => {
-		const fixtures: SeasonFixture[] = Array.from({ length: 200 }, () => ({
-			round: 1,
+		const fixtures: SeasonFixture[] = Array.from({ length: 200 }, (_, i) => ({
+			round: i + 1,
 			homeClubId: 1,
 			awayClubId: 2,
 		}));
@@ -177,11 +193,8 @@ describe("simulateSeason / simulateSeasons", () => {
 			calls.push(round);
 			return bestEleven(squad);
 		};
-		// Rounds of 2 matches: club 1 plays in rounds 1..6 of a 4-club double round-robin.
-		const fixtures = input.fixtures.map((f, i) => ({
-			...f,
-			round: Math.floor(i / 2) + 1,
-		}));
+		// Club 1 plays in every round 1..6 of a 4-club double round-robin.
+		const fixtures = input.fixtures;
 		const rounds = new Set(
 			fixtures
 				.filter((f) => f.homeClubId === 1 || f.awayClubId === 1)
@@ -216,10 +229,7 @@ describe("simulateSeason / simulateSeasons", () => {
 		const squads = new Map(
 			ids.map((id) => [id, squadOf(id, 60 + id)] as const),
 		);
-		const fixtures = doubleRoundRobin(ids).map((f, i) => ({
-			...f,
-			round: Math.floor(i / 10) + 1,
-		}));
+		const fixtures = doubleRoundRobin(ids);
 		expect(fixtures).toHaveLength(380);
 		const start = performance.now();
 		const results = simulateSeason(fixtures, squads, createRng(1));
@@ -294,15 +304,8 @@ describe("lineupEffect", () => {
 });
 
 describe("player state in the season", () => {
-	// 4 clubs, 1 match per club per round (rounds of 2 matches).
-	const roundsOf2 = () => {
-		const input = fourClubs();
-		const fixtures = input.fixtures.map((f, i) => ({
-			...f,
-			round: Math.floor(i / 2) + 1,
-		}));
-		return { ...input, fixtures };
-	};
+	// 4 clubs, exactly 1 match per club per round (6 rounds of 2 matches).
+	const roundsOf2 = () => fourClubs();
 	const noInjury = { ...STATE_MODEL, injuryRate: 0 };
 
 	it("(h) an unavailable player is not in the picked lineup", () => {
@@ -328,7 +331,7 @@ describe("player state in the season", () => {
 			disciplineSlope: 0,
 			injuryRate: 0,
 		};
-		simulateSeason(input.fixtures, input.squads, createRng(1), {
+		simulateSeason(input.fixtures, input.squads, createRng(4), {
 			pickers: new Map([[1, spy]]),
 			stateModel,
 		});
@@ -341,14 +344,22 @@ describe("player state in the season", () => {
 			expect(r.ids.some((id) => banned.has(id))).toBe(false);
 		}
 		expect(seen[1]?.ids).toHaveLength(squad1.length - 11);
+		// Exact return: the ban of 3 covers rounds 2-4, in round 5 they are offered and picked again.
+		for (const id of banned) {
+			expect(seen[4]?.ids).toContain(id);
+			expect(lineups[4]?.ids).toContain(id);
+		}
 	});
 
 	it("(h) an injured player is not offered while injured", () => {
 		const input = roundsOf2();
 		const offered: number[][] = [];
+		const picked: number[][] = [];
 		const spy: LineupPicker = (squad) => {
 			offered.push(squad.map((p) => p.playerId));
-			return bestEleven(squad);
+			const l = bestEleven(squad);
+			picked.push(l.map((p) => p.playerId));
+			return l;
 		};
 		const stateModel = {
 			...STATE_MODEL,
@@ -368,6 +379,36 @@ describe("player state in the season", () => {
 		expect(offered[0]?.some((id) => injuredAfterR1.has(id))).toBe(true);
 		expect(offered[1]?.some((id) => injuredAfterR1.has(id))).toBe(false);
 		expect(offered[2]?.some((id) => injuredAfterR1.has(id))).toBe(false);
+		// Exact return: in round 4 they are offered and picked again.
+		for (const id of injuredAfterR1) {
+			expect(offered[3]).toContain(id);
+			expect(picked[3]).toContain(id);
+		}
+	});
+
+	it("throws when a club plays twice in one round (consequences on and off)", () => {
+		const fixtures: SeasonFixture[] = [
+			{ round: 3, homeClubId: 1, awayClubId: 2 },
+			{ round: 3, homeClubId: 3, awayClubId: 1 },
+		];
+		const squads = new Map([[1, squadOf(1, 70)]]);
+		for (const consequences of [true, false]) {
+			expect(() =>
+				simulateSeason(fixtures, squads, createRng(1), { consequences }),
+			).toThrow("simulateSeason: club 1 plays twice in round 3");
+		}
+	});
+
+	it("matchStrength counts missing slots as 0", () => {
+		const eleven = bestEleven(squadOf(1, 70));
+		expect(eleven).toHaveLength(11);
+		expect(matchStrength(eleven)).toBeCloseTo(lineupStrength(eleven), 10);
+		const eight = eleven.slice(0, 8);
+		expect(matchStrength(eight)).toBeCloseTo(
+			(lineupStrength(eight) * 8) / 11,
+			10,
+		);
+		expect(matchStrength([])).toBe(0);
 	});
 
 	it("(i) consequences:false ignores player state and uses no extra draws", () => {
@@ -401,11 +442,20 @@ describe("player state in the season", () => {
 	it("(j) a regular starter is tired, a reserve is fresh", () => {
 		const input = roundsOf2();
 		const fitnessSeen = new Map<number, number>();
-		const stateModel = { ...noInjury, yellowBase: 0, redBase: 0 };
+		const stateModel = {
+			...noInjury,
+			yellowBase: 0,
+			redBase: 0,
+			formWeight: 0,
+		};
 		const squad = input.squads.get(1) ?? [];
 		const starters = new Set(bestEleven(squad).map((p) => p.playerId));
 		const spy: LineupPicker = (sq) => {
-			for (const p of sq) fitnessSeen.set(p.playerId, p.overall);
+			for (const p of sq)
+				fitnessSeen.set(
+					p.playerId,
+					Math.min(fitnessSeen.get(p.playerId) ?? Infinity, p.overall),
+				);
 			return bestEleven(sq);
 		};
 		simulateSeason(input.fixtures, input.squads, createRng(4), {
@@ -510,10 +560,7 @@ describe("player state in the season", () => {
 		const squads = new Map(
 			ids.map((id) => [id, squadOf(id, 60 + id)] as const),
 		);
-		const fixtures = doubleRoundRobin(ids).map((f, i) => ({
-			...f,
-			round: Math.floor(i / 10) + 1,
-		}));
+		const fixtures = doubleRoundRobin(ids);
 		const start = performance.now();
 		const { results } = simulateSeasonDetailed(fixtures, squads, createRng(1), {
 			consequences: true,

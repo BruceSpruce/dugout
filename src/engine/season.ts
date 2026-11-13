@@ -74,6 +74,11 @@ export function simulateSeason(
 	return simulateSeasonDetailed(fixtures, squads, rng, opts).results;
 }
 
+/** Strength of a lineup for the match: missing slots (fewer than 11 available players) count as 0. */
+export function matchStrength(lineup: PlayerAttributes[]): number {
+	return (lineupStrength(lineup) * Math.min(lineup.length, 11)) / 11;
+}
+
 type Prepared = { strength: number; lineup: PlayerAttributes[] };
 
 /**
@@ -95,6 +100,22 @@ export function simulateSeasonDetailed(
 		.map((f, i) => ({ f, i }))
 		.sort((a, b) => a.f.round - b.f.round || a.i - b.i)
 		.map((x) => x.f);
+	const playedInRound = new Map<number, Set<number>>();
+	for (const f of ordered) {
+		let seen = playedInRound.get(f.round);
+		if (!seen) {
+			seen = new Set();
+			playedInRound.set(f.round, seen);
+		}
+		for (const id of [f.homeClubId, f.awayClubId]) {
+			if (seen.has(id)) {
+				throw new Error(
+					`simulateSeason: club ${id} plays twice in round ${f.round}`,
+				);
+			}
+			seen.add(id);
+		}
+	}
 	const results: FixtureResult[] = [];
 	const states = new Map<number, PlayerState>();
 	const originals = new Map<number, PlayerAttributes>();
