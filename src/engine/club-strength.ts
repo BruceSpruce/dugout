@@ -41,12 +41,15 @@ export function bestEleven(squad: PlayerAttributes[]): PlayerAttributes[] {
 	return [...picked, ...fillers];
 }
 
+/** Mean overall of the given eleven, unrounded (0 for an empty lineup). */
+export function lineupStrength(eleven: PlayerAttributes[]): number {
+	if (eleven.length === 0) return 0;
+	return eleven.reduce((s, p) => s + p.overall, 0) / eleven.length;
+}
+
 /** Mean overall of the best eleven, rounded to 1 decimal (0 for an empty squad). */
 export function clubStrength(squad: PlayerAttributes[]): number {
-	const eleven = bestEleven(squad);
-	if (eleven.length === 0) return 0;
-	const mean = eleven.reduce((s, p) => s + p.overall, 0) / eleven.length;
-	return Math.round(mean * 10) / 10;
+	return Math.round(lineupStrength(bestEleven(squad)) * 10) / 10;
 }
 
 export type FixtureResult = {

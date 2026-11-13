@@ -5,6 +5,7 @@ import {
 	clubStrength,
 	compareStrengthToTable,
 	leagueTable,
+	lineupStrength,
 	spearman,
 } from "./club-strength";
 
@@ -236,5 +237,18 @@ describe("compareStrengthToTable", () => {
 		const c = compareStrengthToTable(strengths, renamed);
 		expect(c.rows[5]?.name).toBe("H");
 		expect(c.top6Hits).toBe(5);
+	});
+});
+
+describe("lineupStrength", () => {
+	it("is the unrounded mean overall, 0 for an empty lineup", () => {
+		expect(lineupStrength([])).toBe(0);
+		const lineup = [
+			player("Defender", 70),
+			player("Midfielder", 71),
+			player("Attacker", 72),
+		];
+		expect(lineupStrength(lineup)).toBeCloseTo(71, 10);
+		expect(lineupStrength(lineup.slice(0, 2))).toBe(70.5);
 	});
 });
