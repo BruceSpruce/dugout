@@ -6,6 +6,7 @@ import {
 	date,
 	index,
 	integer,
+	jsonb,
 	numeric,
 	pgTableCreator,
 	text,
@@ -211,3 +212,17 @@ export const gameResult = createTable(
 		index("game_result_fixture_idx").on(t.fixtureId),
 	],
 );
+
+// One saved lineup per game: starters in the slot order of the formation, bench of 0-9.
+export const gameLineup = createTable("game_lineup", {
+	gameId: integer("game_id")
+		.primaryKey()
+		.references(() => game.id, { onDelete: "cascade" }),
+	formation: text().notNull(),
+	style: text().notNull(),
+	starters: jsonb().$type<number[]>().notNull(),
+	bench: jsonb().$type<number[]>().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+		.notNull()
+		.defaultNow(),
+});

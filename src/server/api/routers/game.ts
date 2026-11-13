@@ -1,15 +1,30 @@
 import { TRPCError } from "@trpc/server";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { bestElevenFor, teamRatings } from "~/engine/tactics";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { club, game } from "~/server/db/schema";
+import { club, game, gameLineup } from "~/server/db/schema";
+import {
+	aiProposal,
+	FORMATION_IDS,
+	loadClubSquad,
+	STYLE_IDS,
+	sortSquad,
+	validateLineup,
+} from "~/server/game/lineup";
 import {
 	latestSeasonId,
 	loadRoundScreenInput,
 	loadSeasonClubs,
 } from "~/server/game/load-round-screen";
 import { buildRoundScreen } from "~/server/game/round-screen";
+
+const GAME_NOT_FOUND = "Nie ma takiej gry";
+const gameId = z.number().int().positive();
+const formationInput = z.enum(FORMATION_IDS);
+const styleInput = z.enum(STYLE_IDS);
+const playerIds = z.array(z.number().int().positive());
 
 const SEASON_NOT_LOADED =
 	"Sezon nie jest załadowany — uruchom npm run import:season";
@@ -75,5 +90,103 @@ export const gameRouter = createTRPCRouter({
 				});
 			}
 			return buildRoundScreen(data);
+		}),
+
+	lineup: publicProcedure
+		.input(z.object({ gameId }))
+		.query(async ({ ctx, input }) => {
+			const data = await loadClubSquad(ctx.db, input.gameId);
+			if (!data) {
+				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+			}
+			const [saved] = await ctx.db
+				.select({
+					formation: gameLineup.formation,
+					style: gameLineup.style,
+					starters: gameLineup.starters,
+					bench: gameLineup.bench,
+				})
+				.from(gameLineup)
+				.where(eq(gameLineup.gameId, input.gameId));
+			return {
+				squad: sortSquad(data.squad),
+				saved: saved ?? null,
+				proposal: aiProposal(data.squad, "4-4-2"),
+			};
+		}),
+
+	aiLineup: publicProcedure
+		.input(z.object({ gameId, formation: formationInput }))
+		.query(async ({ ctx, input }) => {
+			const data = await loadClubSquad(ctx.db, input.gameId);
+			if (!data) {
+				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+			}
+			return aiProposal(data.squad, input.formation);
+		}),
+
+	ratings: publicProcedure
+		.input(
+			z.object({
+				gameId,
+				formation: formationInput,
+				style: styleInput,
+				starters: playerIds,
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			const data = await loadClubSquad(ctx.db, input.gameId);
+			if (!data) {
+				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+			}
+			const byId = new Map(data.squad.map((p) => [p.playerId, p]));
+			const slots = bestElevenFor([], input.formation).map((slot, i) => ({
+				role: slot.role,
+				player: byId.get(input.starters[i] ?? -1) ?? null,
+			}));
+			const r = teamRatings(slots, {
+				formation: input.formation,
+				style: input.style,
+			});
+			const round1 = (x: number) => Math.round(x * 10) / 10;
+			return { attack: round1(r.attack), defense: round1(r.defense) };
+		}),
+
+	saveLineup: publicProcedure
+		.input(
+			z.object({
+				gameId,
+				formation: formationInput,
+				style: styleInput,
+				starters: playerIds,
+				bench: playerIds,
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			const data = await loadClubSquad(ctx.db, input.gameId);
+			if (!data) {
+				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+			}
+			const checked = validateLineup(
+				input,
+				new Set(data.squad.map((p) => p.playerId)),
+			);
+			if (!checked.ok) {
+				throw new TRPCError({ code: "BAD_REQUEST", message: checked.error });
+			}
+			const values = {
+				formation: input.formation,
+				style: input.style,
+				starters: input.starters,
+				bench: input.bench,
+			};
+			await ctx.db
+				.insert(gameLineup)
+				.values({ gameId: input.gameId, ...values })
+				.onConflictDoUpdate({
+					target: gameLineup.gameId,
+					set: { ...values, updatedAt: sql`now()` },
+				});
+			return { ok: true as const };
 		}),
 });
