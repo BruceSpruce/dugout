@@ -99,20 +99,23 @@ describe("buildRoundScreen", () => {
 		const s = buildRoundScreen({ ...base, currentRound: 4 });
 		expect(s.nextMatch).toBeNull();
 		expect(s.previousRound?.round).toBe(3);
+		expect(s.previousRound?.matches).toEqual([]);
 	});
 
-	it("(e) only game results count, never real fixture goals", () => {
-		const withReal = fixtures.map((f) => ({
-			...f,
-			homeGoals: 5,
-			awayGoals: 0,
-		}));
+	it("(e) ignores game results whose fixture is not in this season's fixtures", () => {
 		const s = buildRoundScreen({
 			...base,
 			currentRound: 2,
-			fixtures: withReal,
+			results: [{ fixtureId: 999, homeGoals: 5, awayGoals: 0 }],
 		});
-		expect(s.table.every((r) => r.points === 0)).toBe(true);
+		expect(s.table.every((r) => r.points === 0 && r.played === 0)).toBe(true);
 		expect(s.previousRound?.matches).toEqual([]);
+	});
+
+	it("(f) last round with a match: next match in that round, kickoff date kept", () => {
+		const s = buildRoundScreen({ ...base, currentRound: 3 });
+		expect(s.nextMatch).toMatchObject({ fixtureId: 5, round: 3, home: true });
+		expect(s.nextMatch?.kickoffAt).toEqual(new Date(Date.UTC(2024, 7, 3)));
+		expect(s.clubId).toBe(1);
 	});
 });

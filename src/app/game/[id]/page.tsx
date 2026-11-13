@@ -73,7 +73,7 @@ export default async function GamePage({
 						{table.map((r) => (
 							<tr
 								className={
-									r.name === screen.clubName
+									r.clubId === screen.clubId
 										? "bg-white/20 font-bold"
 										: "border-t border-white/10"
 								}

@@ -18,6 +18,7 @@ export type RoundScreenInput = {
 };
 
 export type RoundScreen = {
+	clubId: number;
 	clubName: string;
 	round: number;
 	totalRounds: number;
@@ -76,6 +77,7 @@ export function buildRoundScreen(input: RoundScreenInput): RoundScreen {
 
 	const previous = currentRound - 1;
 	return {
+		clubId,
 		clubName: nameOf(clubId),
 		round: currentRound,
 		totalRounds,
