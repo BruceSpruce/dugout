@@ -61,8 +61,17 @@ export type SquadRowInput = {
 const zeroCounters = (): Counters =>
 	Object.fromEntries(COUNTER_KEYS.map((k) => [k, 0])) as Counters;
 
-const asPosition = (p: string | null): Position | null =>
-	p !== null && POSITIONS.includes(p) ? (p as Position) : null;
+// API-Football returns "Forward" for some players next to the usual "Attacker" (PL 2024: 24 squads rows).
+const POSITION_ALIASES: Readonly<Record<string, Position>> = {
+	Forward: "Attacker",
+};
+
+const asPosition = (p: string | null): Position | null => {
+	if (p === null) return null;
+	const alias = POSITION_ALIASES[p];
+	if (alias) return alias;
+	return POSITIONS.includes(p) ? (p as Position) : null;
+};
 
 /**
  * One PlayerInput per squad member. Counters are summed over the player's rows; club and position

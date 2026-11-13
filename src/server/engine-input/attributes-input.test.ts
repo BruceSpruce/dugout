@@ -95,6 +95,21 @@ describe("aggregatePlayerRows", () => {
 		expect(p?.position).toBe("Defender");
 	});
 
+	it("maps the API alias Forward to Attacker in squad and stat rows", () => {
+		const [p] = aggregatePlayerRows(
+			[row({ position: "Forward", minutes: 100 })],
+			[member({ position: "Forward" })],
+			played,
+		);
+		expect(p?.position).toBe("Attacker");
+		const [q] = aggregatePlayerRows(
+			[row({ position: "Forward", minutes: 100 })],
+			[member({ position: null })],
+			played,
+		);
+		expect(q?.position).toBe("Attacker");
+	});
+
 	it("falls back to Midfielder when no position is known", () => {
 		const [p] = aggregatePlayerRows(
 			[row({ position: null, minutes: 100 })],
