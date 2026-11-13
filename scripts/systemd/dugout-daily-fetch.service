@@ -3,6 +3,10 @@
 [Unit]
 Description=Dugout daily league download (API-Football Free quota)
 After=network-online.target docker.service
+# After resume from suspend Persistent=true fires before the network is up (2026-11-13: fetch failed
+# 3 s after wake). A failed run sends no API request, so retrying costs no quota.
+StartLimitIntervalSec=2h
+StartLimitBurst=6
 
 [Service]
 Type=oneshot
@@ -10,3 +14,5 @@ WorkingDirectory=@WORKDIR@
 Environment=PATH=@PATH@
 ExecStart=@NPM@ run --silent daily:fetch
 TimeoutStartSec=1h
+Restart=on-failure
+RestartSec=2min
