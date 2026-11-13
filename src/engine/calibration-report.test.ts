@@ -126,6 +126,7 @@ describe("buildCalibrationReport", () => {
 			logBaseGoals: 1.5,
 			homeAdvantage: 0.22,
 			strengthBeta: 0.02,
+			drawRho: 0,
 		};
 		const r = buildCalibrationReport(build(), {
 			seasons: SEASONS,
@@ -141,7 +142,12 @@ describe("buildCalibrationReport", () => {
 		const r = buildCalibrationReport(build(), {
 			seasons: SEASONS,
 			now: fixedNow,
-			model: { logBaseGoals: 0.17, homeAdvantage: -1, strengthBeta: 0.02 },
+			model: {
+				logBaseGoals: 0.17,
+				homeAdvantage: -1,
+				strengthBeta: 0.02,
+				drawRho: 0,
+			},
 		});
 		expect(r.exitCode).toBe(3);
 		expect(r.lines[r.lines.length - 1]).toMatch(/^→ FAIL \(.*homeWinPct/);
@@ -151,7 +157,12 @@ describe("buildCalibrationReport", () => {
 		const r = buildCalibrationReport(build(), {
 			seasons: SEASONS,
 			now: fixedNow,
-			model: { logBaseGoals: -1.5, homeAdvantage: 0.22, strengthBeta: 0.02 },
+			model: {
+				logBaseGoals: -1.5,
+				homeAdvantage: 0.22,
+				strengthBeta: 0.02,
+				drawRho: 0,
+			},
 		});
 		expect(r.exitCode).toBe(3);
 		expect(r.lines[r.lines.length - 1]).toMatch(/^→ FAIL \(.*drawPct/);
