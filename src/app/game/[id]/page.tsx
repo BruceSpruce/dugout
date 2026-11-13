@@ -38,7 +38,15 @@ export default async function GamePage({
 				<Link className="text-green-200 hover:underline" href="/">
 					← Gry
 				</Link>
-				<h1 className="mt-2 text-3xl font-extrabold">{screen.clubName}</h1>
+				<div className="mt-2 flex items-center justify-between gap-4">
+					<h1 className="text-3xl font-extrabold">{screen.clubName}</h1>
+					<Link
+						className="rounded bg-white/15 px-3 py-1.5 font-semibold hover:bg-white/25"
+						href={`/game/${gameId}/sklad`}
+					>
+						Skład
+					</Link>
+				</div>
 				<p className="text-green-100">
 					Kolejka {screen.round} / {screen.totalRounds}
 				</p>
