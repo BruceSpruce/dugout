@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { PlayerAttributes, Position } from "./attributes";
-import { bestEleven } from "./club-strength";
+import { bestEleven, lineupStrength } from "./club-strength";
 import { createRng } from "./rng";
 import {
+	type LineupPicker,
 	leagueStats,
 	lineupEffect,
 	pickBestEleven,
@@ -144,6 +145,47 @@ describe("simulateSeason / simulateSeasons", () => {
 		const squads = new Map([[1, squadOf(1, 70)]]);
 		const results = simulateSeason(fixtures, squads, createRng(3));
 		expect(results.map((r) => r.homeClubId)).toEqual([2, 1, 1]);
+	});
+
+	it("a club missing from squads has strength 0 and loses to a full squad", () => {
+		const fixtures: SeasonFixture[] = Array.from({ length: 200 }, () => ({
+			round: 1,
+			homeClubId: 1,
+			awayClubId: 2,
+		}));
+		const squads = new Map([[1, squadOf(1, 90)]]);
+		const results = simulateSeason(fixtures, squads, createRng(5));
+		const sum = (f: (r: (typeof results)[number]) => number) =>
+			results.reduce((a, r) => a + f(r), 0);
+		// Club 2 has no squad: lineupStrength([]) is 0, so club 1 outscores it clearly.
+		expect(lineupStrength([])).toBe(0);
+		expect(sum((r) => r.homeGoals)).toBeGreaterThan(sum((r) => r.awayGoals));
+	});
+
+	it("calls a club's picker once per round it plays, with that round number", () => {
+		const input = fourClubs();
+		const calls: number[] = [];
+		const picker: LineupPicker = (squad, round) => {
+			calls.push(round);
+			return bestEleven(squad);
+		};
+		// Rounds of 2 matches: club 1 plays in rounds 1..6 of a 4-club double round-robin.
+		const fixtures = input.fixtures.map((f, i) => ({
+			...f,
+			round: Math.floor(i / 2) + 1,
+		}));
+		const rounds = new Set(
+			fixtures
+				.filter((f) => f.homeClubId === 1 || f.awayClubId === 1)
+				.map((f) => f.round),
+		);
+		simulateSeason(fixtures, input.squads, createRng(2), {
+			pickers: new Map([[1, picker]]),
+		});
+		expect([...calls].sort((a, b) => a - b)).toEqual(
+			[...rounds].sort((a, b) => a - b),
+		);
+		expect(calls).toHaveLength(rounds.size);
 	});
 
 	it("(d) a stronger club earns more points on average", () => {

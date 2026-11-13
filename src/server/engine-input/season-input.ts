@@ -3,18 +3,18 @@
 
 import { sql } from "drizzle-orm";
 
-import type { SeasonFixture } from "~/engine/season";
+import type { CalibrationReportInput } from "~/engine/calibration-report";
 import type { Db } from "~/import/api-football/load";
-import { type AttributesInput, loadAttributesInput } from "./attributes-input";
+import { loadAttributesInput } from "./attributes-input";
 
-export type SeasonInput = AttributesInput & { fixtures: SeasonFixture[] };
+export type CalibrationInput = Omit<CalibrationReportInput, "season">;
 
 /** Null when the season is not loaded (no competition_season row). */
 export async function loadSeasonInput(
 	db: Db,
 	league: number,
 	season: number,
-): Promise<SeasonInput | null> {
+): Promise<CalibrationInput | null> {
 	const base = await loadAttributesInput(db, league, season);
 	if (!base) return null;
 	const seasonRows = await db.execute<{ id: number }>(

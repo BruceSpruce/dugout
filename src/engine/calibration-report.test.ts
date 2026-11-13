@@ -137,6 +137,26 @@ describe("buildCalibrationReport", () => {
 		expect(last).toMatch(/^→ FAIL \(.*goalsPerMatch/);
 	});
 
+	it("fails on homeWinPct when home advantage is strongly negative", () => {
+		const r = buildCalibrationReport(build(), {
+			seasons: SEASONS,
+			now: fixedNow,
+			model: { logBaseGoals: 0.17, homeAdvantage: -1, strengthBeta: 0.02 },
+		});
+		expect(r.exitCode).toBe(3);
+		expect(r.lines[r.lines.length - 1]).toMatch(/^→ FAIL \(.*homeWinPct/);
+	});
+
+	it("fails on drawPct when goals are so rare that 0-0 dominates", () => {
+		const r = buildCalibrationReport(build(), {
+			seasons: SEASONS,
+			now: fixedNow,
+			model: { logBaseGoals: -1.5, homeAdvantage: 0.22, strengthBeta: 0.02 },
+		});
+		expect(r.exitCode).toBe(3);
+		expect(r.lines[r.lines.length - 1]).toMatch(/^→ FAIL \(.*drawPct/);
+	});
+
 	it("returns exit 1 and one line for an unknown club", () => {
 		const r = buildCalibrationReport(build(), {
 			seasons: SEASONS,
