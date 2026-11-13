@@ -126,7 +126,7 @@ describe("scoreProbabilities", () => {
 			[2, 1],
 		] as const) {
 			const freq = (counts.get(`${x}-${y}`) ?? 0) / n;
-			expect(Math.abs(freq - (grid[x]?.[y] ?? 0))).toBeLessThan(0.005);
+			expect(Math.abs(freq - (grid[x]?.[y] ?? 0))).toBeLessThan(0.003);
 		}
 	});
 

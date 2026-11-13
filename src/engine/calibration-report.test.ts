@@ -165,15 +165,16 @@ describe("buildCalibrationReport", () => {
 		const r = buildCalibrationReport(build(), {
 			seasons: SEASONS,
 			now: fixedNow,
+			// S-03 model: league averages inside the PRD ranges, table too flat.
 			model: {
-				logBaseGoals: 0.07,
-				homeAdvantage: 0.25,
-				strengthBeta: 0,
-				drawRho: -0.1,
+				logBaseGoals: 0.17,
+				homeAdvantage: 0.22,
+				strengthBeta: 0.02,
+				drawRho: 0,
 			},
 		});
 		expect(r.exitCode).toBe(3);
-		expect(r.lines[r.lines.length - 1]).toMatch(/^→ FAIL \(.*pointsStd/);
+		expect(r.lines[r.lines.length - 1]).toBe("→ FAIL (pointsStd)");
 	});
 
 	it("fails on homeWinPct when home advantage is strongly negative", () => {
