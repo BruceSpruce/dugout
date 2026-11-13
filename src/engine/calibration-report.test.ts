@@ -5,6 +5,7 @@ import {
 	type CalibrationReportInput,
 } from "./calibration-report";
 import type { MatchModel } from "./match";
+import { STATE_MODEL, type StateModel } from "./player-state";
 
 const counters = (goals: number): Counters => ({
 	goals,
@@ -97,6 +98,14 @@ function build(): CalibrationReportInput {
 
 const SEASONS = 30;
 const fixedNow = () => 0;
+const CALIBRATED_MATCH: MatchModel = {
+	logBaseGoals: 0.07,
+	homeAdvantage: 0.25,
+	strengthBeta: 0.055,
+	drawRho: -0.1,
+};
+// Explicit card rate for the synthetic league (yellows/match inside 3.6-4.8).
+const YELLOW_OK: StateModel = { ...STATE_MODEL, yellowBase: 0.17 };
 
 describe("buildCalibrationReport", () => {
 	it("prints header, metrics, top 6, two lineup lines and a final verdict in <= 30 lines", () => {
@@ -205,6 +214,39 @@ describe("buildCalibrationReport", () => {
 		});
 		expect(r.exitCode).toBe(3);
 		expect(r.lines[r.lines.length - 1]).toMatch(/^→ FAIL \(.*drawPct/);
+	});
+
+	it("prints the card and state rows and passes the yellowsPerMatch gate", () => {
+		const r = buildCalibrationReport(build(), {
+			seasons: SEASONS,
+			now: fixedNow,
+			model: CALIBRATED_MATCH,
+			stateModel: YELLOW_OK,
+		});
+		const text = r.lines.join("\n");
+		for (const label of [
+			"żółte/mecz",
+			"czerwone/mecz",
+			"kontuzjowani/klub",
+			"pauzy/klub/sezon",
+			"kondycja 11",
+		]) {
+			expect(text).toContain(label);
+		}
+		expect(r.lines.length).toBeLessThanOrEqual(30);
+		expect(r.exitCode).toBe(0);
+		expect(r.lines[r.lines.length - 1]).toBe("→ PASS");
+	});
+
+	it("fails only on yellowsPerMatch when yellow cards are 3x too frequent", () => {
+		const r = buildCalibrationReport(build(), {
+			seasons: SEASONS,
+			now: fixedNow,
+			model: CALIBRATED_MATCH,
+			stateModel: { ...YELLOW_OK, yellowBase: YELLOW_OK.yellowBase * 3 },
+		});
+		expect(r.exitCode).toBe(3);
+		expect(r.lines[r.lines.length - 1]).toBe("→ FAIL (yellowsPerMatch)");
 	});
 
 	it("returns exit 1 and one line for an unknown club", () => {

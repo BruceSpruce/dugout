@@ -50,13 +50,17 @@ export type StateModel = {
 	formWeight: number;
 };
 
-/** Starting values, calibrated in phase 3. */
+/**
+ * Calibrated 2026-11-13 on PL 2024 (100 seasons, seed 1): yellows 4.24/match (real 4.21), reds 0.140 (real 0.139),
+ * injured per club 2.50, bans per club 7.0, lineup fitness 74.2; match gates unchanged (goals 2.73, home 44.2%, draws 23.8%, std 17.6).
+ * secondYellowShare is per yellow card (real: 0.037 second-yellow reds per match / 4.2 yellows).
+ */
 export const STATE_MODEL: StateModel = {
-	yellowBase: 4.21 / 22,
-	redBase: 0.07 / 22,
-	secondYellowShare: 0.26,
+	yellowBase: 0.1671,
+	redBase: 0.00416,
+	secondYellowShare: 0.0088,
 	disciplineSlope: 1,
-	injuryRate: 0.055,
+	injuryRate: 0.065,
 	injuryDurations: [
 		{ matches: [1, 1], weight: 0.45 },
 		{ matches: [2, 4], weight: 0.3 },

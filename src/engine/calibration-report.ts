@@ -10,6 +10,7 @@ import {
 	spearman,
 } from "./club-strength";
 import type { MatchModel } from "./match";
+import type { StateModel } from "./player-state";
 import {
 	type LeagueStats,
 	leagueStats,
@@ -26,6 +27,7 @@ export const GOALS_RANGE: readonly [number, number] = [2.5, 2.9];
 export const HOME_WIN_PCT_RANGE: readonly [number, number] = [40, 48];
 export const DRAW_PCT_RANGE: readonly [number, number] = [22, 28];
 export const POINTS_STD_RANGE: readonly [number, number] = [15, 21];
+export const YELLOWS_PER_MATCH_RANGE: readonly [number, number] = [3.6, 4.8];
 
 export type CalibrationReportInput = {
 	/** Label printed in the header, e.g. "39/2024". */
@@ -42,6 +44,7 @@ export type CalibrationReportOptions = {
 	club?: string;
 	now?: () => number;
 	model?: MatchModel;
+	stateModel?: StateModel;
 };
 
 export type CalibrationReport = { lines: string[]; exitCode: 0 | 1 | 3 };
@@ -68,7 +71,10 @@ export function buildCalibrationReport(
 	const seasons = opts.seasons ?? 100;
 	const seed = opts.seed ?? 1;
 	const now = opts.now ?? (() => performance.now());
-	const modelOpts = opts.model ? { model: opts.model } : {};
+	const modelOpts = {
+		...(opts.model ? { model: opts.model } : {}),
+		...(opts.stateModel ? { stateModel: opts.stateModel } : {}),
+	};
 
 	let lineupClub =
 		opts.club !== undefined ? findClub(input, opts.club) : undefined;
@@ -95,6 +101,17 @@ export function buildCalibrationReport(
 	}
 
 	const real = leagueStats(input.results, input.clubs);
+	// Real cards come from player counters (substitutes included), per match with a result.
+	if (input.results.length > 0) {
+		let yellows = 0;
+		let reds = 0;
+		for (const p of input.players) {
+			yellows += p.counters.yellowCards;
+			reds += p.counters.redCards + p.counters.yellowRedCards;
+		}
+		real.yellowsPerMatch = yellows / input.results.length;
+		real.redsPerMatch = reds / input.results.length;
+	}
 	const realTable = leagueTable(input.results, input.clubs);
 	const seasonInput: SeasonInput = {
 		fixtures: input.fixtures,
@@ -120,7 +137,7 @@ export function buildCalibrationReport(
 		pf: string,
 		d = 2,
 	) =>
-		`${label.padEnd(18)} ${f(simV, d).padStart(7)} ${f(realV, d).padStart(7)} ${range.padStart(9)} ${pf}`;
+		`${label.padEnd(18)} ${f(simV, d).padStart(7)} ${(Number.isNaN(realV) ? "—" : f(realV, d)).padStart(7)} ${range.padStart(9)} ${pf}`;
 
 	const lines = [
 		`kalibracja ${input.season}: sezonów ${seasons}, seed ${seed}, ${Math.round(elapsed)} ms (${f(seasons > 0 ? elapsed / seasons : 0, 1)} ms/sezon), kluby ${input.clubs.length}`,
@@ -157,6 +174,20 @@ export function buildCalibrationReport(
 			gate("pointsStd", inRange(s.pointsStd, POINTS_STD_RANGE)),
 			1,
 		),
+		row(
+			"żółte/mecz",
+			s.yellowsPerMatch,
+			real.yellowsPerMatch,
+			`${YELLOWS_PER_MATCH_RANGE[0]}–${YELLOWS_PER_MATCH_RANGE[1]}`,
+			gate(
+				"yellowsPerMatch",
+				inRange(s.yellowsPerMatch, YELLOWS_PER_MATCH_RANGE),
+			),
+		),
+		row("czerwone/mecz", s.redsPerMatch, real.redsPerMatch, "", "info", 3),
+		row("kontuzjowani/klub", s.injuredPerClub, Number.NaN, "", "info", 2),
+		row("pauzy/klub/sezon", s.suspensionsPerClub, Number.NaN, "", "info", 2),
+		row("kondycja 11", s.avgLineupFitness, Number.NaN, "", "info", 1),
 		row("mistrz pkt", s.championPoints, real.championPoints, "", "info", 1),
 		row("ostatni pkt", s.lastPoints, real.lastPoints, "", "info", 1),
 		`top ${TOP_ROWS} wg siły: ${"klub".padEnd(20)} siła  śr.msc  mistrz%  top4%  real`,
