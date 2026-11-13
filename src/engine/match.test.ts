@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	expectedGoals,
+	expectedGoalsRatings,
 	MATCH_MODEL,
 	MAX_GOALS,
 	scoreProbabilities,
@@ -140,5 +141,28 @@ describe("scoreProbabilities", () => {
 		};
 		expect(run(5)).toEqual(run(5));
 		expect(run(5)).not.toEqual(run(6));
+	});
+});
+
+describe("expectedGoalsRatings", () => {
+	it("with attack = defense = strength equals expectedGoals", () => {
+		const r = expectedGoalsRatings(
+			{ attack: 74, defense: 74 },
+			{ attack: 66, defense: 66 },
+		);
+		expect(r).toEqual(expectedGoals(74, 66));
+	});
+
+	it("better attack against weaker defense raises that side's lambda only", () => {
+		const base = expectedGoalsRatings(
+			{ attack: 70, defense: 70 },
+			{ attack: 70, defense: 70 },
+		);
+		const r = expectedGoalsRatings(
+			{ attack: 75, defense: 70 },
+			{ attack: 70, defense: 70 },
+		);
+		expect(r.home).toBeGreaterThan(base.home);
+		expect(r.away).toBeCloseTo(base.away, 12);
 	});
 });

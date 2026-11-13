@@ -23,18 +23,36 @@ export const MATCH_MODEL: MatchModel = {
 	drawRho: -0.1,
 };
 
+export type Ratings = { attack: number; defense: number };
+
+/** Goals from one side's attack against the other's defense; attack = defense = strength is the strength-gap model. */
+export function expectedGoalsRatings(
+	home: Ratings,
+	away: Ratings,
+	model: MatchModel = MATCH_MODEL,
+): { home: number; away: number } {
+	return {
+		home: Math.exp(
+			model.logBaseGoals +
+				model.homeAdvantage +
+				model.strengthBeta * (home.attack - away.defense),
+		),
+		away: Math.exp(
+			model.logBaseGoals + model.strengthBeta * (away.attack - home.defense),
+		),
+	};
+}
+
 export function expectedGoals(
 	homeStrength: number,
 	awayStrength: number,
 	model: MatchModel = MATCH_MODEL,
 ): { home: number; away: number } {
-	const delta = homeStrength - awayStrength;
-	return {
-		home: Math.exp(
-			model.logBaseGoals + model.homeAdvantage + model.strengthBeta * delta,
-		),
-		away: Math.exp(model.logBaseGoals - model.strengthBeta * delta),
-	};
+	return expectedGoalsRatings(
+		{ attack: homeStrength, defense: homeStrength },
+		{ attack: awayStrength, defense: awayStrength },
+		model,
+	);
 }
 
 function poissonPmf(lambda: number): number[] {
@@ -83,13 +101,13 @@ export function scoreProbabilities(
 }
 
 /** One rng() call: inverse-CDF draw over the score grid, row by row (home, then away). */
-export function simulateMatch(
-	homeStrength: number,
-	awayStrength: number,
+export function simulateMatchRatings(
+	home: Ratings,
+	away: Ratings,
 	rng: Rng,
 	model: MatchModel = MATCH_MODEL,
 ): { homeGoals: number; awayGoals: number } {
-	const lambda = expectedGoals(homeStrength, awayStrength, model);
+	const lambda = expectedGoalsRatings(home, away, model);
 	const grid = scoreProbabilities(lambda.home, lambda.away, model.drawRho);
 	let u = rng();
 	let last = { homeGoals: 0, awayGoals: 0 };
@@ -104,4 +122,18 @@ export function simulateMatch(
 		}
 	}
 	return last;
+}
+
+export function simulateMatch(
+	homeStrength: number,
+	awayStrength: number,
+	rng: Rng,
+	model: MatchModel = MATCH_MODEL,
+): { homeGoals: number; awayGoals: number } {
+	return simulateMatchRatings(
+		{ attack: homeStrength, defense: homeStrength },
+		{ attack: awayStrength, defense: awayStrength },
+		rng,
+		model,
+	);
 }
