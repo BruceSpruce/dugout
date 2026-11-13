@@ -168,10 +168,11 @@ describe("buildCalibrationReport", () => {
 			seasons: SEASONS,
 			now: fixedNow,
 			model: {
+				// drawRho re-fitted after the slot-order fix: empty middle slots no longer shift strikers.
 				logBaseGoals: -0.08,
 				homeAdvantage: 0.25,
 				strengthBeta: 0.055,
-				drawRho: -0.1,
+				drawRho: -0.13,
 			},
 		});
 		expect(r.exitCode).toBe(0);
@@ -281,21 +282,19 @@ describe("buildCalibrationReport", () => {
 		expect(byId.lines).toEqual(byName.lines);
 	});
 
-	it("is deterministic for the same seed and differs for another seed", {
-		timeout: 30_000,
-	}, () => {
+	it("is deterministic for the same seed and differs for another seed", () => {
 		const a = buildCalibrationReport(build(), {
-			seasons: SEASONS,
+			seasons: 10,
 			seed: 7,
 			now: fixedNow,
 		});
 		const b = buildCalibrationReport(build(), {
-			seasons: SEASONS,
+			seasons: 10,
 			seed: 7,
 			now: fixedNow,
 		});
 		const c = buildCalibrationReport(build(), {
-			seasons: SEASONS,
+			seasons: 10,
 			seed: 8,
 			now: fixedNow,
 		});

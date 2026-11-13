@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import type { PlayerAttributes, Position } from "~/engine/attributes";
 import {
@@ -22,6 +22,7 @@ type Lineup = {
 };
 
 const BENCH_SIZE = 9;
+const STARTERS_SIZE = 11;
 
 const FORMATION_IDS = Object.keys(FORMATIONS) as FormationId[];
 
@@ -71,6 +72,11 @@ function pitchRows(formation: FormationId) {
 	return rows.reverse();
 }
 
+/** Fixed 11-length slot array: the i-th id sits in the i-th slot, null = empty slot. */
+function padStarters(starters: number[]): (number | null)[] {
+	return Array.from({ length: STARTERS_SIZE }, (_, i) => starters[i] ?? null);
+}
+
 function padBench(bench: number[]): (number | null)[] {
 	return Array.from({ length: BENCH_SIZE }, (_, i) => bench[i] ?? null);
 }
@@ -117,12 +123,16 @@ export function LineupEditor({
 	const [style, setStyle] = useState<Style>(
 		isStyle(initial.style) ? initial.style : "balanced",
 	);
-	const [starters, setStarters] = useState<number[]>(initial.starters);
+	const [starters, setStarters] = useState<(number | null)[]>(
+		padStarters(initial.starters),
+	);
 	const [bench, setBench] = useState<(number | null)[]>(
 		padBench(initial.bench),
 	);
 	const [busy, setBusy] = useState(false);
 	const [aiError, setAiError] = useState<string | null>(null);
+	const [clientError, setClientError] = useState<string | null>(null);
+	const requestId = useRef(0);
 
 	const utils = api.useUtils();
 	const save = api.game.saveLineup.useMutation();
@@ -138,11 +148,12 @@ export function LineupEditor({
 	}));
 	const ratings = teamRatings(slots, { formation, style });
 
-	const starterSet = new Set(starters);
+	const starterSet = new Set(starters.filter((x): x is number => x !== null));
 	const benchSet = new Set(bench.filter((x): x is number => x !== null));
 
 	const touch = () => {
 		if (save.isSuccess || save.isError) save.reset();
+		setClientError(null);
 	};
 
 	/** Put `playerId` into the target spot; its previous occupant takes the player's old place. */
@@ -159,11 +170,11 @@ export function LineupEditor({
 		const fromStarter = nextStarters.indexOf(playerId);
 		const fromBench = nextBench.indexOf(playerId);
 		// a starter cannot be moved onto an empty bench spot: it would leave its slot empty
-		if (fromStarter >= 0 && previous === null) return;
-		if (fromStarter >= 0) nextStarters[fromStarter] = previous as number;
+		if (fromStarter >= 0 && previous === null && target === "bench") return;
+		if (fromStarter >= 0) nextStarters[fromStarter] = previous;
 		if (fromBench >= 0) nextBench[fromBench] = previous;
 		lists[target][index] = playerId;
-		// a starter slot can never become empty: a bench player moved into it frees only the bench
+		// a bench player moved into a starter slot frees only the bench
 		setStarters(nextStarters);
 		setBench(nextBench);
 	};
@@ -174,36 +185,45 @@ export function LineupEditor({
 	};
 
 	const applyProposal = (p: Lineup) => {
-		setStarters(p.starters);
+		setStarters(padStarters(p.starters));
 		setBench(padBench(p.bench));
 	};
 
-	const run = async (job: () => Promise<void>) => {
+	/** Only the latest request applies its result; stale responses are ignored. */
+	const run = async (job: (isLatest: () => boolean) => Promise<void>) => {
+		const id = ++requestId.current;
+		const isLatest = () => requestId.current === id;
 		setBusy(true);
 		setAiError(null);
 		try {
-			await job();
+			await job(isLatest);
 		} catch (e) {
-			setAiError(
-				e instanceof Error ? e.message : "Nie udało się pobrać propozycji",
-			);
+			if (isLatest()) {
+				setAiError(
+					e instanceof Error ? e.message : "Nie udało się pobrać propozycji",
+				);
+			}
 		} finally {
-			setBusy(false);
+			if (isLatest()) setBusy(false);
 		}
 	};
 
 	const aiProposal = () =>
-		run(async () => {
+		run(async (isLatest) => {
 			touch();
-			applyProposal(await utils.game.aiLineup.fetch({ gameId, formation }));
+			const ai = await utils.game.aiLineup.fetch({ gameId, formation });
+			if (isLatest()) applyProposal(ai);
 		});
 
 	const changeFormation = (next: FormationId) =>
-		run(async () => {
+		run(async (isLatest) => {
 			touch();
 			const ai = await utils.game.aiLineup.fetch({ gameId, formation: next });
+			if (!isLatest()) return;
 			const used = new Set<number>();
-			const pool = starters.filter((id) => byId.has(id));
+			const pool = starters.filter(
+				(id): id is number => id !== null && byId.has(id),
+			);
 			const roles = FORMATIONS[next];
 			const result: (number | null)[] = roles.map((role) => {
 				const hit = pool.find(
@@ -224,11 +244,10 @@ export function LineupEditor({
 					result[i] = fill;
 				}
 			}
-			const nextStarters = result.filter((x): x is number => x !== null);
-			const taken = new Set(nextStarters);
+			const taken = new Set(result.filter((x): x is number => x !== null));
 			const candidates = [
 				...bench.filter((x): x is number => x !== null),
-				...starters,
+				...starters.filter((x): x is number => x !== null),
 				...ai.bench,
 				...ai.starters,
 			];
@@ -239,16 +258,22 @@ export function LineupEditor({
 				nextBench.push(id);
 			}
 			setFormation(next);
-			setStarters(nextStarters);
+			setStarters(result);
 			setBench(padBench(nextBench));
 		});
 
 	const submit = () => {
+		const filled = starters.filter((x): x is number => x !== null);
+		if (filled.length !== STARTERS_SIZE) {
+			setClientError("Skład musi mieć 11 zawodników");
+			return;
+		}
+		setClientError(null);
 		save.mutate({
 			gameId,
 			formation,
 			style,
-			starters,
+			starters: filled,
 			bench: bench.filter((x): x is number => x !== null),
 		});
 	};
@@ -278,6 +303,7 @@ export function LineupEditor({
 					Styl gry
 					<select
 						className="rounded bg-[#071a0e] px-2 py-1 text-white ring-1 ring-white/20"
+						disabled={busy}
 						onChange={(e) => {
 							const v = e.target.value;
 							if (isStyle(v)) {
@@ -330,11 +356,14 @@ export function LineupEditor({
 									<select
 										aria-label={`Slot ${ROLE_LABEL[row.role]} ${i}`}
 										className={selectClass}
-										onChange={(e) =>
-											place("starter", i, Number(e.target.value))
-										}
+										disabled={busy}
+										onChange={(e) => {
+											const v = e.target.value;
+											if (v !== "") place("starter", i, Number(v));
+										}}
 										value={starters[i] ?? ""}
 									>
+										<option value="">—</option>
 										<PlayerOptions role={row.role} squad={squad} />
 									</select>
 								</div>
@@ -351,6 +380,7 @@ export function LineupEditor({
 						<select
 							aria-label={`Ławka ${i + 1}`}
 							className={selectClass}
+							disabled={busy}
 							// biome-ignore lint/suspicious/noArrayIndexKey: fixed-size list of positional slots
 							key={i}
 							onChange={(e) => {
@@ -383,6 +413,9 @@ export function LineupEditor({
 					<span className="text-red-300">{save.error.message}</span>
 				) : null}
 				{aiError ? <span className="text-red-300">{aiError}</span> : null}
+				{clientError ? (
+					<span className="text-red-300">{clientError}</span>
+				) : null}
 			</section>
 
 			<section>

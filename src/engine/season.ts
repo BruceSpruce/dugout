@@ -2,11 +2,7 @@
 // Pure module: no imports outside src/engine/ (runs from the CLI for calibration).
 
 import type { PlayerAttributes } from "./attributes";
-import {
-	type FixtureResult,
-	leagueTable,
-	lineupStrength,
-} from "./club-strength";
+import { type FixtureResult, leagueTable } from "./club-strength";
 import {
 	MATCH_MODEL,
 	type MatchModel,
@@ -40,35 +36,36 @@ export type SeasonFixture = {
 };
 
 /**
- * Picks the lineup for a round. The players must be returned in slot order of the tactic's
- * formation (FORMATIONS[tactic.formation]): the i-th player takes the i-th slot, missing
- * trailing players leave empty slots.
+ * Picks the lineup for a round. Returns one entry per slot of the tactic's formation
+ * (FORMATIONS[tactic.formation]), in slot order: length 11, the i-th entry takes the i-th slot,
+ * null leaves that slot empty (no compaction, so later players keep their roles).
  */
 export type LineupPicker = (
 	squad: PlayerAttributes[],
 	round: number,
 	tactic: Tactic,
-) => PlayerAttributes[];
+) => (PlayerAttributes | null)[];
 
-/** Players of the filled slots of the best eleven for the formation, in slot order. */
+/** Players of the best eleven for the formation, in slot order; null for an empty slot. */
 export function bestElevenInSlotOrder(
 	squad: PlayerAttributes[],
 	tactic: Tactic = DEFAULT_TACTIC,
-): PlayerAttributes[] {
-	return bestElevenFor(squad, tactic.formation).flatMap((s) =>
-		s.player ? [s.player] : [],
-	);
+): (PlayerAttributes | null)[] {
+	return bestElevenFor(squad, tactic.formation).map((s) => s.player);
 }
+
+const present = (lineup: (PlayerAttributes | null)[]): PlayerAttributes[] =>
+	lineup.filter((p): p is PlayerAttributes => p !== null);
 
 /** AI coach: always the best eleven for the club's formation. */
 export const pickBestEleven = (
 	squad: PlayerAttributes[],
 	_round = 0,
 	tactic: Tactic = DEFAULT_TACTIC,
-): PlayerAttributes[] => bestElevenInSlotOrder(squad, tactic);
+): (PlayerAttributes | null)[] => bestElevenInSlotOrder(squad, tactic);
 
-/** Rebuilds slots from a picker's lineup: the i-th player fills the i-th formation role. */
-function slotsOf(lineup: PlayerAttributes[], tactic: Tactic): Slot[] {
+/** Rebuilds slots from a picker's lineup: the i-th entry fills the i-th formation role (null = empty). */
+function slotsOf(lineup: (PlayerAttributes | null)[], tactic: Tactic): Slot[] {
 	return FORMATIONS[tactic.formation].map((role, i) => ({
 		role,
 		player: lineup[i] ?? null,
@@ -114,11 +111,6 @@ export function simulateSeason(
 	opts: SeasonOptions = {},
 ): FixtureResult[] {
 	return simulateSeasonDetailed(fixtures, squads, rng, opts).results;
-}
-
-/** Strength of a lineup for the match: missing slots (fewer than 11 available players) count as 0. */
-export function matchStrength(lineup: PlayerAttributes[]): number {
-	return (lineupStrength(lineup) * Math.min(lineup.length, 11)) / 11;
 }
 
 type Prepared = { ratings: Ratings; lineup: PlayerAttributes[] };
@@ -184,10 +176,10 @@ export function simulateSeasonDetailed(
 		const squad = squads.get(clubId) ?? [];
 		let prepared: Prepared;
 		if (!consequences) {
-			const lineup = picker(squad, round, tactic);
+			const picked = picker(squad, round, tactic);
 			prepared = {
-				ratings: teamRatings(slotsOf(lineup, tactic), tactic),
-				lineup,
+				ratings: teamRatings(slotsOf(picked, tactic), tactic),
+				lineup: present(picked),
 			};
 		} else {
 			const available: PlayerAttributes[] = [];
@@ -205,7 +197,8 @@ export function simulateSeasonDetailed(
 					});
 				}
 			}
-			const lineup = picker(available, round, tactic);
+			const picked = picker(available, round, tactic);
+			const lineup = present(picked);
 			injuredSum += injured;
 			clubRounds++;
 			for (const p of lineup) {
@@ -213,7 +206,7 @@ export function simulateSeasonDetailed(
 				fitnessCount++;
 			}
 			prepared = {
-				ratings: teamRatings(slotsOf(lineup, tactic), tactic),
+				ratings: teamRatings(slotsOf(picked, tactic), tactic),
 				lineup,
 			};
 		}
@@ -442,9 +435,9 @@ export function reserveEleven(
 	squad: PlayerAttributes[],
 	_round = 0,
 	tactic: Tactic = DEFAULT_TACTIC,
-): PlayerAttributes[] {
+): (PlayerAttributes | null)[] {
 	const ids = new Set(
-		bestElevenInSlotOrder(squad, tactic).map((p) => p.playerId),
+		present(bestElevenInSlotOrder(squad, tactic)).map((p) => p.playerId),
 	);
 	return bestElevenInSlotOrder(
 		squad.filter((p) => !ids.has(p.playerId)),
@@ -458,8 +451,8 @@ export function weakenedEleven(
 	_round = 0,
 	tactic: Tactic = DEFAULT_TACTIC,
 	drop = 3,
-): PlayerAttributes[] {
-	const top = [...bestElevenInSlotOrder(squad, tactic)]
+): (PlayerAttributes | null)[] {
+	const top = present(bestElevenInSlotOrder(squad, tactic))
 		.sort((a, b) => b.overall - a.overall || a.playerId - b.playerId)
 		.slice(0, drop);
 	const ids = new Set(top.map((p) => p.playerId));

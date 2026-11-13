@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { PlayerAttributes, Position } from "./attributes";
 import { bestEleven, lineupStrength } from "./club-strength";
-import { MATCH_MODEL, simulateMatch } from "./match";
+import { MATCH_MODEL, simulateMatchRatings } from "./match";
 import { STATE_MODEL } from "./player-state";
 import { createRng } from "./rng";
 import {
 	type LineupPicker,
 	leagueStats,
 	lineupEffect,
-	matchStrength,
 	pickBestEleven,
 	reserveEleven,
 	type SeasonFixture,
@@ -17,7 +16,18 @@ import {
 	simulateSeasons,
 	weakenedEleven,
 } from "./season";
-import { DEFAULT_TACTIC, type Tactic } from "./tactics";
+import {
+	bestElevenFor,
+	DEFAULT_TACTIC,
+	type Tactic,
+	teamRatings,
+} from "./tactics";
+
+/** Pads a plain lineup to 11 slot-ordered entries (trailing nulls). */
+const padded = (lineup: PlayerAttributes[]): (PlayerAttributes | null)[] => [
+	...lineup,
+	...Array.from({ length: Math.max(0, 11 - lineup.length) }, () => null),
+];
 
 let nextId = 1;
 const player = (
@@ -192,7 +202,7 @@ describe("simulateSeason / simulateSeasons", () => {
 		const calls: number[] = [];
 		const picker: LineupPicker = (squad, round) => {
 			calls.push(round);
-			return bestEleven(squad);
+			return padded(bestEleven(squad));
 		};
 		// Club 1 plays in every round 1..6 of a 4-club double round-robin.
 		const fixtures = input.fixtures;
@@ -245,14 +255,16 @@ describe("reserveEleven / weakenedEleven", () => {
 	it("(e) reserveEleven shares no playerId with bestEleven, also with fillers", () => {
 		const full = squadOf(1, 80);
 		const ids = new Set(bestEleven(full).map((p) => p.playerId));
-		expect(reserveEleven(full).some((p) => ids.has(p.playerId))).toBe(false);
+		expect(reserveEleven(full).some((p) => p && ids.has(p.playerId))).toBe(
+			false,
+		);
 
 		// No goalkeeper: best eleven contains an out-of-position filler copy.
 		const noKeeper = squadOf(1, 80).filter((p) => p.position !== "Goalkeeper");
 		const keeperIds = new Set(bestEleven(noKeeper).map((p) => p.playerId));
 		const reserve = reserveEleven(noKeeper);
 		expect(reserve.length).toBeGreaterThan(0);
-		expect(reserve.some((p) => keeperIds.has(p.playerId))).toBe(false);
+		expect(reserve.some((p) => p && keeperIds.has(p.playerId))).toBe(false);
 	});
 
 	it("(e) weakenedEleven drops the 3 best of the best eleven", () => {
@@ -270,10 +282,10 @@ describe("reserveEleven / weakenedEleven", () => {
 		);
 		expect([...top3].sort()).toEqual([85, 90, 95]);
 		const weakened = weakenedEleven(squad);
-		expect(weakened.some((p) => p.overall >= 85)).toBe(false);
+		expect(weakened.some((p) => p && p.overall >= 85)).toBe(false);
 		const best = bestEleven(squad).map((p) => p.playerId);
-		for (const p of weakened.filter((x) => best.includes(x.playerId))) {
-			expect([95, 90, 85]).not.toContain(p.overall);
+		for (const p of weakened.filter((x) => x && best.includes(x.playerId))) {
+			expect([95, 90, 85]).not.toContain(p?.overall);
 		}
 		expect(weakened).toHaveLength(11);
 	});
@@ -357,12 +369,15 @@ describe("player state in the season", () => {
 		const seen: { round: number; ids: number[] }[] = [];
 		const picker: LineupPicker = (squad, round) => {
 			seen.push({ round, ids: squad.map((p) => p.playerId) });
-			return bestEleven(squad);
+			return padded(bestEleven(squad));
 		};
 		const lineups: { round: number; ids: number[] }[] = [];
 		const spy: LineupPicker = (squad, round, tactic) => {
 			const l = picker(squad, round, tactic);
-			lineups.push({ round, ids: l.map((p) => p.playerId) });
+			lineups.push({
+				round,
+				ids: l.flatMap((p) => (p ? [p.playerId] : [])),
+			});
 			return l;
 		};
 		// Everybody is banned after the first match (yellow certain, 3-match straight red certain-ish).
@@ -402,7 +417,7 @@ describe("player state in the season", () => {
 			offered.push(squad.map((p) => p.playerId));
 			const l = bestEleven(squad);
 			picked.push(l.map((p) => p.playerId));
-			return l;
+			return padded(l);
 		};
 		const stateModel = {
 			...STATE_MODEL,
@@ -442,20 +457,18 @@ describe("player state in the season", () => {
 		}
 	});
 
-	it("matchStrength counts missing slots as 0", () => {
-		const eleven = bestEleven(squadOf(1, 70));
-		expect(eleven).toHaveLength(11);
-		expect(matchStrength(eleven)).toBeCloseTo(lineupStrength(eleven), 10);
-		const eight = eleven.slice(0, 8);
-		expect(matchStrength(eight)).toBeCloseTo(
-			(lineupStrength(eight) * 8) / 11,
-			10,
-		);
-		expect(matchStrength([])).toBe(0);
-	});
-
 	it("(i) consequences:false ignores player state and uses no extra draws", () => {
-		const input = fourClubs();
+		const base = fourClubs();
+		// Varied overalls, so the expected ratings really test the strength formula.
+		const input = {
+			...base,
+			squads: new Map(
+				[...base.squads].map(([id, sq]) => [
+					id,
+					sq.map((p, i) => ({ ...p, overall: p.overall + ((i * 7) % 13) - 6 })),
+				]),
+			),
+		};
 		const rough = new Map(
 			[...input.squads].map(([id, sq]) => [
 				id,
@@ -467,12 +480,17 @@ describe("player state in the season", () => {
 		expect(run(rough, false)).toEqual(run(input.squads, false));
 		// Reds and injuries matter when consequences are on.
 		expect(run(rough, true)).not.toEqual(run(input.squads, true));
-		// Same draw path as plain S-10: simulateMatch only, one stream.
+		// Same draw path as plain S-10: one match draw per fixture, one stream.
 		const rng = createRng(9);
+		const ratingsOf = (clubId: number) =>
+			teamRatings(
+				bestElevenFor(input.squads.get(clubId) ?? [], DEFAULT_TACTIC.formation),
+				DEFAULT_TACTIC,
+			);
 		const manual = input.fixtures.map((f) =>
-			simulateMatch(
-				lineupStrength(bestEleven(input.squads.get(f.homeClubId) ?? [])),
-				lineupStrength(bestEleven(input.squads.get(f.awayClubId) ?? [])),
+			simulateMatchRatings(
+				ratingsOf(f.homeClubId),
+				ratingsOf(f.awayClubId),
 				rng,
 				MATCH_MODEL,
 			),
@@ -480,6 +498,52 @@ describe("player state in the season", () => {
 		expect(
 			run(input.squads, false).map((r) => [r.homeGoals, r.awayGoals]),
 		).toEqual(manual.map((m) => [m.homeGoals, m.awayGoals]));
+	});
+
+	it("a gap in the middle of the formation leaves later players in their slots", () => {
+		// 4-4-2 with one midfielder: 3 CM slots stay empty, both strikers must stay in ST slots.
+		const squad = [
+			player("Goalkeeper", 70),
+			...Array.from({ length: 4 }, () => player("Defender", 70)),
+			player("Midfielder", 70),
+			player("Attacker", 90),
+			player("Attacker", 90),
+		];
+		const slots = bestElevenFor(squad, "4-4-2");
+		expect(slots.filter((s) => s.player === null)).toHaveLength(3);
+		const picked = pickBestEleven(squad, 0, DEFAULT_TACTIC);
+		expect(picked).toHaveLength(11);
+		expect(picked.map((p) => p?.playerId ?? null)).toEqual(
+			slots.map((s) => s.player?.playerId ?? null),
+		);
+		expect(picked[9]?.position).toBe("Attacker");
+		expect(picked[10]?.position).toBe("Attacker");
+
+		// The season builds its ratings from the slot-ordered lineup: equal to the direct slots.
+		const fixtures: SeasonFixture[] = Array.from({ length: 60 }, (_, i) => ({
+			round: i + 1,
+			homeClubId: 1,
+			awayClubId: 2,
+		}));
+		const squads = new Map([
+			[1, squad],
+			[2, squadOf(2, 70)],
+		]);
+		const direct = simulateSeason(fixtures, squads, createRng(1), {
+			consequences: false,
+		});
+		const rng = createRng(1);
+		const ratings1 = teamRatings(slots, DEFAULT_TACTIC);
+		const ratings2 = teamRatings(
+			bestElevenFor(squadOf(2, 70), "4-4-2"),
+			DEFAULT_TACTIC,
+		);
+		const manual = fixtures.map(() =>
+			simulateMatchRatings(ratings1, ratings2, rng, MATCH_MODEL),
+		);
+		expect(direct.map((r) => [r.homeGoals, r.awayGoals])).toEqual(
+			manual.map((m) => [m.homeGoals, m.awayGoals]),
+		);
 	});
 
 	it("(j) a regular starter is tired, a reserve is fresh", () => {
@@ -499,7 +563,7 @@ describe("player state in the season", () => {
 					p.playerId,
 					Math.min(fitnessSeen.get(p.playerId) ?? Infinity, p.overall),
 				);
-			return bestEleven(sq);
+			return padded(bestEleven(sq));
 		};
 		simulateSeason(input.fixtures, input.squads, createRng(4), {
 			pickers: new Map([[1, spy]]),

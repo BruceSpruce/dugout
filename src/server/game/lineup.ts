@@ -49,7 +49,8 @@ export function validateLineup(
 	squadIds: Set<number>,
 ): LineupValidation {
 	const fail = (error: string): LineupValidation => ({ ok: false, error });
-	if (!(input.formation in FORMATIONS)) return fail("Nieznana formacja");
+	if (!Object.hasOwn(FORMATIONS, input.formation))
+		return fail("Nieznana formacja");
 	if (!(STYLE_IDS as readonly string[]).includes(input.style)) {
 		return fail("Nieznany styl gry");
 	}

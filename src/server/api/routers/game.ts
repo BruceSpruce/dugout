@@ -21,10 +21,12 @@ import {
 import { buildRoundScreen } from "~/server/game/round-screen";
 
 const GAME_NOT_FOUND = "Nie ma takiej gry";
-const gameId = z.number().int().positive();
+const MAX_INT = 2147483647;
+const id = z.number().int().positive().max(MAX_INT);
+const gameId = id;
 const formationInput = z.enum(FORMATION_IDS);
 const styleInput = z.enum(STYLE_IDS);
-const playerIds = z.array(z.number().int().positive());
+const bench = z.array(id).max(9);
 
 const SEASON_NOT_LOADED =
 	"Sezon nie jest załadowany — uruchom npm run import:season";
@@ -39,7 +41,7 @@ export const gameRouter = createTRPCRouter({
 	}),
 
 	create: publicProcedure
-		.input(z.object({ clubId: z.number().int().positive() }))
+		.input(z.object({ clubId: id }))
 		.mutation(async ({ ctx, input }) => {
 			const seasonId = await latestSeasonId(ctx.db);
 			if (seasonId === null) {
@@ -80,7 +82,7 @@ export const gameRouter = createTRPCRouter({
 	}),
 
 	roundScreen: publicProcedure
-		.input(z.object({ gameId: z.number().int().positive() }))
+		.input(z.object({ gameId }))
 		.query(async ({ ctx, input }) => {
 			const data = await loadRoundScreenInput(ctx.db, input.gameId);
 			if (!data) {
@@ -131,7 +133,7 @@ export const gameRouter = createTRPCRouter({
 				gameId,
 				formation: formationInput,
 				style: styleInput,
-				starters: playerIds,
+				starters: z.array(id).length(11),
 			}),
 		)
 		.query(async ({ ctx, input }) => {
@@ -158,8 +160,8 @@ export const gameRouter = createTRPCRouter({
 				gameId,
 				formation: formationInput,
 				style: styleInput,
-				starters: playerIds,
-				bench: playerIds,
+				starters: z.array(id).max(11),
+				bench,
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {

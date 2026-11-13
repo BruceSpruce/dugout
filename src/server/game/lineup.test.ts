@@ -96,6 +96,14 @@ describe("validateLineup", () => {
 			/styl/,
 		);
 	});
+
+	it("does not treat Object.prototype keys as formations", () => {
+		for (const formation of ["toString", "constructor", "__proto__"]) {
+			expect(error(validateLineup({ ...good, formation }, ids))).toMatch(
+				/formacja/,
+			);
+		}
+	});
 });
 
 describe("aiProposal", () => {
