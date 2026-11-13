@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { PlayerAttributes, Position } from "./attributes";
 import { bestEleven, lineupStrength } from "./club-strength";
+import { MATCH_MODEL, simulateMatch } from "./match";
+import { STATE_MODEL } from "./player-state";
 import { createRng } from "./rng";
 import {
 	type LineupPicker,
@@ -10,6 +12,7 @@ import {
 	reserveEleven,
 	type SeasonFixture,
 	simulateSeason,
+	simulateSeasonDetailed,
 	simulateSeasons,
 	weakenedEleven,
 } from "./season";
@@ -106,6 +109,11 @@ describe("leagueStats", () => {
 			pointsStd: 0,
 			championPoints: 0,
 			lastPoints: 0,
+			yellowsPerMatch: 0,
+			redsPerMatch: 0,
+			injuredPerClub: 0,
+			suspensionsPerClub: 0,
+			avgLineupFitness: 0,
 		});
 	});
 });
@@ -282,5 +290,236 @@ describe("lineupEffect", () => {
 	it("gives se 0 for n < 2", () => {
 		const r = lineupEffect(fourClubs(), 1, reserveEleven, 1, 5);
 		expect(r.se).toBe(0);
+	});
+});
+
+describe("player state in the season", () => {
+	// 4 clubs, 1 match per club per round (rounds of 2 matches).
+	const roundsOf2 = () => {
+		const input = fourClubs();
+		const fixtures = input.fixtures.map((f, i) => ({
+			...f,
+			round: Math.floor(i / 2) + 1,
+		}));
+		return { ...input, fixtures };
+	};
+	const noInjury = { ...STATE_MODEL, injuryRate: 0 };
+
+	it("(h) an unavailable player is not in the picked lineup", () => {
+		const input = roundsOf2();
+		const squad1 = input.squads.get(1) ?? [];
+		const seen: { round: number; ids: number[] }[] = [];
+		const picker: LineupPicker = (squad, round) => {
+			seen.push({ round, ids: squad.map((p) => p.playerId) });
+			return bestEleven(squad);
+		};
+		const lineups: { round: number; ids: number[] }[] = [];
+		const spy: LineupPicker = (squad, round) => {
+			const l = picker(squad, round);
+			lineups.push({ round, ids: l.map((p) => p.playerId) });
+			return l;
+		};
+		// Everybody is banned after the first match (yellow certain, 3-match straight red certain-ish).
+		const stateModel = {
+			...STATE_MODEL,
+			yellowBase: 1,
+			redBase: 1,
+			secondYellowShare: 0,
+			disciplineSlope: 0,
+			injuryRate: 0,
+		};
+		simulateSeason(input.fixtures, input.squads, createRng(1), {
+			pickers: new Map([[1, spy]]),
+			stateModel,
+		});
+		// Round 1: full squad offered; later rounds: the 11 red-carded players are out for 3 matches.
+		const first = seen[0];
+		expect(first?.ids).toHaveLength(squad1.length);
+		const banned = new Set(lineups[0]?.ids);
+		expect(banned.size).toBe(11);
+		for (const r of seen.slice(1, 4)) {
+			expect(r.ids.some((id) => banned.has(id))).toBe(false);
+		}
+		expect(seen[1]?.ids).toHaveLength(squad1.length - 11);
+	});
+
+	it("(h) an injured player is not offered while injured", () => {
+		const input = roundsOf2();
+		const offered: number[][] = [];
+		const spy: LineupPicker = (squad) => {
+			offered.push(squad.map((p) => p.playerId));
+			return bestEleven(squad);
+		};
+		const stateModel = {
+			...STATE_MODEL,
+			yellowBase: 0,
+			redBase: 0,
+			injuryRate: 1,
+			injuryDurations: [{ matches: [2, 2] as [number, number], weight: 1 }],
+		};
+		simulateSeason(input.fixtures, input.squads, createRng(1), {
+			pickers: new Map([[1, spy]]),
+			stateModel,
+		});
+		const injuredAfterR1 = new Set(
+			bestEleven(input.squads.get(1) ?? []).map((p) => p.playerId),
+		);
+		// Offered in round 1; out in rounds 2 and 3 (injured for 2 matches); the rest of the squad plays.
+		expect(offered[0]?.some((id) => injuredAfterR1.has(id))).toBe(true);
+		expect(offered[1]?.some((id) => injuredAfterR1.has(id))).toBe(false);
+		expect(offered[2]?.some((id) => injuredAfterR1.has(id))).toBe(false);
+	});
+
+	it("(i) consequences:false ignores player state and uses no extra draws", () => {
+		const input = fourClubs();
+		const rough = new Map(
+			[...input.squads].map(([id, sq]) => [
+				id,
+				sq.map((p) => ({ ...p, discipline: 0 })),
+			]),
+		);
+		const run = (squads: typeof input.squads, consequences: boolean) =>
+			simulateSeason(input.fixtures, squads, createRng(9), { consequences });
+		expect(run(rough, false)).toEqual(run(input.squads, false));
+		// Reds and injuries matter when consequences are on.
+		expect(run(rough, true)).not.toEqual(run(input.squads, true));
+		// Same draw path as plain S-10: simulateMatch only, one stream.
+		const rng = createRng(9);
+		const manual = input.fixtures.map((f) =>
+			simulateMatch(
+				lineupStrength(bestEleven(input.squads.get(f.homeClubId) ?? [])),
+				lineupStrength(bestEleven(input.squads.get(f.awayClubId) ?? [])),
+				rng,
+				MATCH_MODEL,
+			),
+		);
+		expect(
+			run(input.squads, false).map((r) => [r.homeGoals, r.awayGoals]),
+		).toEqual(manual.map((m) => [m.homeGoals, m.awayGoals]));
+	});
+
+	it("(j) a regular starter is tired, a reserve is fresh", () => {
+		const input = roundsOf2();
+		const fitnessSeen = new Map<number, number>();
+		const stateModel = { ...noInjury, yellowBase: 0, redBase: 0 };
+		const squad = input.squads.get(1) ?? [];
+		const starters = new Set(bestEleven(squad).map((p) => p.playerId));
+		const spy: LineupPicker = (sq) => {
+			for (const p of sq) fitnessSeen.set(p.playerId, p.overall);
+			return bestEleven(sq);
+		};
+		simulateSeason(input.fixtures, input.squads, createRng(4), {
+			pickers: new Map([[1, spy]]),
+			stateModel,
+		});
+		// Overall copies are fitness-adjusted: starters (80) are below 80 at some point, bench (50) is not.
+		const starter = squad.find((p) => starters.has(p.playerId));
+		const bench = squad.find((p) => !starters.has(p.playerId));
+		expect(fitnessSeen.get(starter?.playerId ?? -1)).toBeLessThan(
+			starter?.overall ?? 0,
+		);
+		expect(fitnessSeen.get(bench?.playerId ?? -1)).toBeCloseTo(
+			bench?.overall ?? 0,
+			10,
+		);
+	});
+
+	it("(k) state stats on a deterministic mini season", () => {
+		const clubs = [1, 2];
+		const squads = new Map(clubs.map((id) => [id, squadOf(id, 70)] as const));
+		const fixtures: SeasonFixture[] = [
+			{ round: 1, homeClubId: 1, awayClubId: 2 },
+			{ round: 2, homeClubId: 2, awayClubId: 1 },
+		];
+		// Nearly everyone gets a yellow in every match (no red, no injury, no ban before count 5).
+		const stateModel = {
+			...STATE_MODEL,
+			yellowBase: 1,
+			redBase: 0,
+			secondYellowShare: 0,
+			disciplineSlope: 0,
+			injuryRate: 0,
+		};
+		const { results, state } = simulateSeasonDetailed(
+			fixtures,
+			squads,
+			createRng(3),
+			{ stateModel },
+		);
+		// Card probability is capped at 0.95, so ~42 of 44 player-matches.
+		expect(state.yellows).toBeGreaterThan(36);
+		expect(state.yellows).toBeLessThanOrEqual(44);
+		expect(state.reds).toBe(0);
+		expect(state.injuries).toBe(0);
+		expect(state.injuredPerClubRound).toBe(0);
+		expect(state.suspensionsPerClub).toBe(0);
+		// Round 1: fitness 100 (recovery capped), round 2: 100 - 12 + 9 = 97 -> mean 98.5.
+		expect(state.avgLineupFitness).toBeCloseTo(98.5, 10);
+		const stats = leagueStats(
+			results,
+			[
+				{ clubId: 1, name: "A" },
+				{ clubId: 2, name: "B" },
+			],
+			state,
+		);
+		expect(stats.yellowsPerMatch).toBe(state.yellows / 2);
+		expect(stats.redsPerMatch).toBe(0);
+		expect(stats.avgLineupFitness).toBeCloseTo(98.5, 10);
+
+		// Certain straight reds: 22 reds in round 1 -> 3-match bans started per club: 11.
+		const redModel = { ...stateModel, yellowBase: 0, redBase: 1 };
+		const red = simulateSeasonDetailed(fixtures, squads, createRng(3), {
+			stateModel: redModel,
+		}).state;
+		expect(red.reds).toBeGreaterThanOrEqual(22);
+		expect(red.suspensionsPerClub).toBeGreaterThanOrEqual(11);
+		// Certain injuries of 5 matches: round 2 sees 11 injured per club.
+		const injModel = {
+			...stateModel,
+			yellowBase: 0,
+			injuryRate: 1,
+			injuryDurations: [{ matches: [5, 5] as [number, number], weight: 1 }],
+		};
+		const inj = simulateSeasonDetailed(fixtures, squads, createRng(3), {
+			stateModel: injModel,
+		}).state;
+		// Round 2: the 11 injured starters are out, only the 7 reserves play (22 + 14).
+		expect(inj.injuries).toBe(36);
+		expect(inj.injuredPerClubRound).toBeCloseTo(5.5, 10);
+	});
+
+	it("(l) is deterministic per seed with consequences on", () => {
+		const input = roundsOf2();
+		const a = simulateSeasonDetailed(
+			input.fixtures,
+			input.squads,
+			createRng(5),
+		);
+		const b = simulateSeasonDetailed(
+			input.fixtures,
+			input.squads,
+			createRng(5),
+		);
+		expect(b).toEqual(a);
+		expect(a.state.yellows).toBeGreaterThan(0);
+	});
+
+	it("simulates a 20-club season with consequences in under 1000 ms", () => {
+		const ids = Array.from({ length: 20 }, (_, i) => i + 1);
+		const squads = new Map(
+			ids.map((id) => [id, squadOf(id, 60 + id)] as const),
+		);
+		const fixtures = doubleRoundRobin(ids).map((f, i) => ({
+			...f,
+			round: Math.floor(i / 10) + 1,
+		}));
+		const start = performance.now();
+		const { results } = simulateSeasonDetailed(fixtures, squads, createRng(1), {
+			consequences: true,
+		});
+		const elapsed = performance.now() - start;
+		expect(results).toHaveLength(380);
+		expect(elapsed).toBeLessThan(1000);
 	});
 });
