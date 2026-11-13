@@ -25,6 +25,7 @@ import {
 export const GOALS_RANGE: readonly [number, number] = [2.5, 2.9];
 export const HOME_WIN_PCT_RANGE: readonly [number, number] = [40, 48];
 export const DRAW_PCT_RANGE: readonly [number, number] = [22, 28];
+export const POINTS_STD_RANGE: readonly [number, number] = [15, 21];
 
 export type CalibrationReportInput = {
 	/** Label printed in the header, e.g. "39/2024". */
@@ -148,7 +149,14 @@ export function buildCalibrationReport(
 			1,
 		),
 		row("wygrane gości %", s.awayWinPct, real.awayWinPct, "", "info", 1),
-		row("odch. std pkt", s.pointsStd, real.pointsStd, "", "info", 1),
+		row(
+			"odch. std pkt",
+			s.pointsStd,
+			real.pointsStd,
+			`${POINTS_STD_RANGE[0]}–${POINTS_STD_RANGE[1]}`,
+			gate("pointsStd", inRange(s.pointsStd, POINTS_STD_RANGE)),
+			1,
+		),
 		row("mistrz pkt", s.championPoints, real.championPoints, "", "info", 1),
 		row("ostatni pkt", s.lastPoints, real.lastPoints, "", "info", 1),
 		`top ${TOP_ROWS} wg siły: ${"klub".padEnd(20)} siła  śr.msc  mistrz%  top4%  real`,

@@ -37,7 +37,7 @@ const POSITIONS: Position[] = [
 	...Array<Position>(4).fill("Attacker"),
 ];
 
-const N_CLUBS = 8;
+const N_CLUBS = 20;
 
 function build(): CalibrationReportInput {
 	const clubs = Array.from({ length: N_CLUBS }, (_, i) => ({
@@ -56,32 +56,40 @@ function build(): CalibrationReportInput {
 				position,
 				// Starters play a lot, reserves little; quality falls with club number.
 				minutes: k % 2 === 0 ? 2800 - k * 20 : 600 + k * 30,
-				ratingMinutes: 7.6 - c.clubId * 0.08 - (k % 3) * 0.1,
+				ratingMinutes: 7.8 - c.clubId * 0.006 - (k % 3) * 0.1,
 				clubPlayedMinutes: 38 * 90,
-				counters: counters(Math.max(0, 25 - c.clubId * 2 - (k % 4))),
+				counters: counters(
+					Math.max(0, Math.round(26 - c.clubId * 0.15) - (k % 4)),
+				),
 			});
 			id++;
 		});
 	}
-	// Double round-robin: rounds 1..14, each pair home and away.
+	// Double round-robin (circle method): 38 rounds x 10 matches, each pair home and away.
 	const fixtures = [];
 	const results = [];
-	let round = 1;
-	for (const h of clubs) {
-		for (const a of clubs) {
-			if (h.clubId === a.clubId) continue;
-			fixtures.push({
-				round: ((round - 1) % 14) + 1,
-				homeClubId: h.clubId,
-				awayClubId: a.clubId,
-			});
-			results.push({
-				homeClubId: h.clubId,
-				awayClubId: a.clubId,
-				homeGoals: h.clubId < a.clubId ? 2 : 1,
-				awayGoals: h.clubId < a.clubId ? 1 : 1,
-			});
-			round++;
+	const ids = clubs.map((c) => c.clubId);
+	for (let leg = 0; leg < 2; leg++) {
+		for (let r = 0; r < N_CLUBS - 1; r++) {
+			for (let i = 0; i < N_CLUBS / 2; i++) {
+				const x = ids[i] ?? 0;
+				const y = ids[N_CLUBS - 1 - i] ?? 0;
+				const flip = ((i + r) % 2 === 0) !== (leg === 0);
+				const h = flip ? y : x;
+				const a = flip ? x : y;
+				fixtures.push({
+					round: leg * (N_CLUBS - 1) + r + 1,
+					homeClubId: h,
+					awayClubId: a,
+				});
+				results.push({
+					homeClubId: h,
+					awayClubId: a,
+					homeGoals: h < a ? 2 : 1,
+					awayGoals: 1,
+				});
+			}
+			ids.splice(1, 0, ids.pop() ?? 0);
 		}
 	}
 	return { season: "39/2024", players, clubs, results, fixtures };
@@ -136,6 +144,36 @@ describe("buildCalibrationReport", () => {
 		expect(r.exitCode).toBe(3);
 		const last = r.lines[r.lines.length - 1] ?? "";
 		expect(last).toMatch(/^→ FAIL \(.*goalsPerMatch/);
+	});
+
+	it("passes all gates for a calibrated model on a 20-club league", () => {
+		const r = buildCalibrationReport(build(), {
+			seasons: SEASONS,
+			now: fixedNow,
+			model: {
+				logBaseGoals: 0.07,
+				homeAdvantage: 0.25,
+				strengthBeta: 0.055,
+				drawRho: -0.1,
+			},
+		});
+		expect(r.exitCode).toBe(0);
+		expect(r.lines[r.lines.length - 1]).toBe("→ PASS");
+	});
+
+	it("fails on pointsStd when strength does not spread the table", () => {
+		const r = buildCalibrationReport(build(), {
+			seasons: SEASONS,
+			now: fixedNow,
+			model: {
+				logBaseGoals: 0.07,
+				homeAdvantage: 0.25,
+				strengthBeta: 0,
+				drawRho: -0.1,
+			},
+		});
+		expect(r.exitCode).toBe(3);
+		expect(r.lines[r.lines.length - 1]).toMatch(/^→ FAIL \(.*pointsStd/);
 	});
 
 	it("fails on homeWinPct when home advantage is strongly negative", () => {

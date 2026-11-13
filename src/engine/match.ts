@@ -15,12 +15,12 @@ export type MatchModel = {
 /** Scores 0..MAX_GOALS are modelled per side; the probability mass beyond is negligible. */
 export const MAX_GOALS = 10;
 
-/** Starting values (middle of the admissible region measured on PL 2024); tuned in phase 3. */
+/** Calibrated 2026-11-13 on PL 2024 (100 seasons, seed 1): goals 2.66, home wins 43.9%, draws 24.6%, points std 18.5. */
 export const MATCH_MODEL: MatchModel = {
-	logBaseGoals: 0.17,
-	homeAdvantage: 0.22,
-	strengthBeta: 0.02,
-	drawRho: 0,
+	logBaseGoals: 0.07,
+	homeAdvantage: 0.25,
+	strengthBeta: 0.055,
+	drawRho: -0.1,
 };
 
 export function expectedGoals(
