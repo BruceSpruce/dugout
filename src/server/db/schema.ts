@@ -172,3 +172,42 @@ export const fixture = createTable(
 		index("fixture_away_club_idx").on(t.awayClubId),
 	],
 );
+
+// Game state. Results are the game's own, never the real fixture goals.
+
+export const game = createTable(
+	"game",
+	{
+		id: integer().primaryKey().generatedByDefaultAsIdentity(),
+		competitionSeasonId: integer("competition_season_id")
+			.notNull()
+			.references(() => competitionSeason.id),
+		clubId: integer("club_id")
+			.notNull()
+			.references(() => club.id),
+		currentRound: integer("current_round").notNull().default(1),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => [index("game_competition_season_idx").on(t.competitionSeasonId)],
+);
+
+export const gameResult = createTable(
+	"game_result",
+	{
+		id: integer().primaryKey().generatedByDefaultAsIdentity(),
+		gameId: integer("game_id")
+			.notNull()
+			.references(() => game.id, { onDelete: "cascade" }),
+		fixtureId: integer("fixture_id")
+			.notNull()
+			.references(() => fixture.id),
+		homeGoals: integer("home_goals").notNull(),
+		awayGoals: integer("away_goals").notNull(),
+	},
+	(t) => [
+		unique("game_result_game_fixture_uq").on(t.gameId, t.fixtureId),
+		index("game_result_fixture_idx").on(t.fixtureId),
+	],
+);
