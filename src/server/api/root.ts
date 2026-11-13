@@ -1,3 +1,4 @@
+import { gameRouter } from "~/server/api/routers/game";
 import {
 	createCallerFactory,
 	createTRPCRouter,
@@ -12,6 +13,7 @@ import {
  * type-check against an empty router record.
  */
 export const appRouter = createTRPCRouter({
+	game: gameRouter,
 	health: publicProcedure.query(() => ({ ok: true as const })),
 });
 
