@@ -23,6 +23,7 @@ Dugout is a single-user, offline Premier League football manager game. Stack: T3
 
 - `./start-database.sh` — start the `dugout-postgres` container (Docker, `postgres:18`).
 - `npm run attributes:report -- --league 39 --season 2024 [--club <name>]` — player attributes and club strength vs. the final table (needs a loaded season).
+- `npm run calibration:report -- --league 39 --season 2024 [--seasons 100] [--seed 1] [--club <name|apiId>]` — simulated seasons vs. real league stats and PRD ranges, lineup test (needs a loaded season).
 - `npm run dev` — dev server (Turbopack).
 - `npm run db:generate` then `npm run db:migrate` — the only way to change the schema; SQL migrations in `drizzle/` are committed. Do not use `db:push`.
 - `npx tsx scripts/<name>.ts` — run CLI scripts that import from `src/` (`tsx` resolves the `~/` alias; plain `node` does not).
