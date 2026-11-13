@@ -21,6 +21,7 @@ import {
 	simulateSeasons,
 	weakenedEleven,
 } from "./season";
+import { DEFAULT_TACTIC, type Tactic } from "./tactics";
 
 /** PRD ranges (inclusive). */
 export const GOALS_RANGE: readonly [number, number] = [2.5, 2.9];
@@ -226,8 +227,10 @@ export function buildCalibrationReport(
 		for (const [label, name] of variants) {
 			const picker =
 				name === "lineup-weakened"
-					? (sq: PlayerAttributes[]) => weakenedEleven(sq)
-					: (sq: PlayerAttributes[]) => reserveEleven(sq);
+					? (sq: PlayerAttributes[], round: number, tactic: Tactic) =>
+							weakenedEleven(sq, round, tactic)
+					: (sq: PlayerAttributes[], round: number, tactic: Tactic) =>
+							reserveEleven(sq, round, tactic);
 			const e = lineupEffect(
 				seasonInput,
 				club.clubId,
@@ -240,6 +243,36 @@ export function buildCalibrationReport(
 				`  ${label.padEnd(33)} pkt ${f(e.bestPoints, 1)} vs ${f(e.variantPoints, 1)}, różnica ${f(e.diff, 1)}, 2·SE ${f(2 * e.se, 1)} ${gate(name, e.diff > 2 * e.se)}`,
 			);
 		}
+	}
+
+	if (lineupClub) {
+		const clubId = lineupClub.clubId;
+		const matchesPerSeason = input.fixtures.filter(
+			(x) => x.homeClubId === clubId || x.awayClubId === clubId,
+		).length;
+		const goalsOf = (tactic: Tactic) => {
+			const r = simulateSeasons(seasonInput, seasons, seed, {
+				...modelOpts,
+				tactics: new Map([[clubId, tactic]]),
+			});
+			const per = (m: Map<number, number[]>) =>
+				matchesPerSeason > 0 ? mean(m.get(clubId) ?? []) / matchesPerSeason : 0;
+			return `${f(per(r.goalsFor))}/${f(per(r.goalsAgainst))}`;
+		};
+		const compare = (label: string, a: [string, Tactic], b: [string, Tactic]) =>
+			`  ${label.padEnd(28)} gole ${goalsOf(a[1])} vs ${goalsOf(b[1])} na mecz (${a[0]} vs ${b[0]}, strzelone/stracone)`;
+		lines.push(
+			compare(
+				"styl ofensywny vs defensywny",
+				["ofens.", { ...DEFAULT_TACTIC, style: "attacking" }],
+				["defens.", { ...DEFAULT_TACTIC, style: "defensive" }],
+			),
+			compare(
+				"formacja 4-3-3 vs 5-3-2",
+				["4-3-3", { ...DEFAULT_TACTIC, formation: "4-3-3" }],
+				["5-3-2", { ...DEFAULT_TACTIC, formation: "5-3-2" }],
+			),
+		);
 	}
 
 	lines.push(failed.length === 0 ? "→ PASS" : `→ FAIL (${failed.join(", ")})`);

@@ -53,8 +53,9 @@ export type TacticsModel = {
 
 /**
  * Role weights sum to 2 per role, so a formation shift is a pure attack <-> defense trade
- * and no formation dominates. kappa 2.5: 4-3-3 and 3-5-2 +1.5 / -1.5, 3-4-3 +3 / -3,
- * 5-3-2 -1.5 / +1.5, 4-5-1 -2.25 / +2.25, 4-2-3-1 0 / 0.
+ * and no formation dominates. kappa 4 (raised from 2.5 in the 2026-11-13 recalibration so that
+ * 4-3-3 out-scores 5-3-2 also for a club whose third striker is weak): 4-3-3 and 3-5-2 +2.4 / -2.4,
+ * 3-4-3 +4.8 / -4.8, 5-3-2 -2.4 / +2.4, 4-5-1 -3.6 / +3.6, 4-2-3-1 0 / 0.
  */
 export const TACTICS_MODEL: TacticsModel = {
 	roleWeights: {
@@ -65,7 +66,7 @@ export const TACTICS_MODEL: TacticsModel = {
 		AM: { attack: 1.4, defense: 0.6 },
 		ST: { attack: 1.6, defense: 0.4 },
 	},
-	formationScale: 2.5,
+	formationScale: 4,
 	styleShift: 2,
 };
 

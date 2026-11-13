@@ -3,12 +3,16 @@
 
 import type { PlayerAttributes } from "./attributes";
 import {
-	bestEleven,
 	type FixtureResult,
 	leagueTable,
 	lineupStrength,
 } from "./club-strength";
-import { MATCH_MODEL, type MatchModel, simulateMatch } from "./match";
+import {
+	MATCH_MODEL,
+	type MatchModel,
+	type Ratings,
+	simulateMatchRatings,
+} from "./match";
 import {
 	beforeRound,
 	effectiveOverall,
@@ -20,6 +24,14 @@ import {
 	updateForm,
 } from "./player-state";
 import { createRng, type Rng } from "./rng";
+import {
+	bestElevenFor,
+	DEFAULT_TACTIC,
+	FORMATIONS,
+	type Slot,
+	type Tactic,
+	teamRatings,
+} from "./tactics";
 
 export type SeasonFixture = {
 	round: number;
@@ -27,16 +39,46 @@ export type SeasonFixture = {
 	awayClubId: number;
 };
 
+/**
+ * Picks the lineup for a round. The players must be returned in slot order of the tactic's
+ * formation (FORMATIONS[tactic.formation]): the i-th player takes the i-th slot, missing
+ * trailing players leave empty slots.
+ */
 export type LineupPicker = (
 	squad: PlayerAttributes[],
 	round: number,
+	tactic: Tactic,
 ) => PlayerAttributes[];
 
-/** AI coach v1: always the best eleven. */
-export const pickBestEleven: LineupPicker = (squad) => bestEleven(squad);
+/** Players of the filled slots of the best eleven for the formation, in slot order. */
+export function bestElevenInSlotOrder(
+	squad: PlayerAttributes[],
+	tactic: Tactic = DEFAULT_TACTIC,
+): PlayerAttributes[] {
+	return bestElevenFor(squad, tactic.formation).flatMap((s) =>
+		s.player ? [s.player] : [],
+	);
+}
+
+/** AI coach: always the best eleven for the club's formation. */
+export const pickBestEleven = (
+	squad: PlayerAttributes[],
+	_round = 0,
+	tactic: Tactic = DEFAULT_TACTIC,
+): PlayerAttributes[] => bestElevenInSlotOrder(squad, tactic);
+
+/** Rebuilds slots from a picker's lineup: the i-th player fills the i-th formation role. */
+function slotsOf(lineup: PlayerAttributes[], tactic: Tactic): Slot[] {
+	return FORMATIONS[tactic.formation].map((role, i) => ({
+		role,
+		player: lineup[i] ?? null,
+	}));
+}
 
 export type SeasonOptions = {
 	pickers?: Map<number, LineupPicker>;
+	/** Tactic per club id; clubs without an entry play DEFAULT_TACTIC. */
+	tactics?: Map<number, Tactic>;
 	model?: MatchModel;
 	stateModel?: StateModel;
 	/** Player state between rounds (cards, injuries, fitness, form). Default true; false = S-10 behaviour. */
@@ -79,7 +121,7 @@ export function matchStrength(lineup: PlayerAttributes[]): number {
 	return (lineupStrength(lineup) * Math.min(lineup.length, 11)) / 11;
 }
 
-type Prepared = { strength: number; lineup: PlayerAttributes[] };
+type Prepared = { ratings: Ratings; lineup: PlayerAttributes[] };
 
 /**
  * Like `simulateSeason`, plus state statistics. With consequences on, a club's players only get
@@ -137,12 +179,16 @@ export function simulateSeasonDetailed(
 		}
 		const cached = cache.get(clubId);
 		if (cached) return cached;
-		const picker = opts.pickers?.get(clubId) ?? pickBestEleven;
+		const picker: LineupPicker = opts.pickers?.get(clubId) ?? pickBestEleven;
+		const tactic = opts.tactics?.get(clubId) ?? DEFAULT_TACTIC;
 		const squad = squads.get(clubId) ?? [];
 		let prepared: Prepared;
 		if (!consequences) {
-			const lineup = picker(squad, round);
-			prepared = { strength: lineupStrength(lineup), lineup };
+			const lineup = picker(squad, round, tactic);
+			prepared = {
+				ratings: teamRatings(slotsOf(lineup, tactic), tactic),
+				lineup,
+			};
 		} else {
 			const available: PlayerAttributes[] = [];
 			let injured = 0;
@@ -159,14 +205,17 @@ export function simulateSeasonDetailed(
 					});
 				}
 			}
-			const lineup = picker(available, round);
+			const lineup = picker(available, round, tactic);
 			injuredSum += injured;
 			clubRounds++;
 			for (const p of lineup) {
 				fitnessSum += states.get(p.playerId)?.fitness ?? 100;
 				fitnessCount++;
 			}
-			prepared = { strength: lineupStrength(lineup), lineup };
+			prepared = {
+				ratings: teamRatings(slotsOf(lineup, tactic), tactic),
+				lineup,
+			};
 		}
 		cache.set(clubId, prepared);
 		return prepared;
@@ -200,9 +249,9 @@ export function simulateSeasonDetailed(
 		clubIds.add(f.awayClubId);
 		const home = prepare(f.homeClubId, f.round);
 		const away = prepare(f.awayClubId, f.round);
-		const { homeGoals, awayGoals } = simulateMatch(
-			home.strength,
-			away.strength,
+		const { homeGoals, awayGoals } = simulateMatchRatings(
+			home.ratings,
+			away.ratings,
 			rng,
 			model,
 		);
@@ -330,6 +379,9 @@ export type SeasonsResult = {
 	perSeason: LeagueStats[];
 	positions: Map<number, number[]>;
 	points: Map<number, number[]>;
+	/** Goals scored / conceded per club per season. */
+	goalsFor: Map<number, number[]>;
+	goalsAgainst: Map<number, number[]>;
 };
 
 /** Simulates n seasons from one rng seeded with `seed`; `stats` is the mean over seasons. */
@@ -343,9 +395,13 @@ export function simulateSeasons(
 	const perSeason: LeagueStats[] = [];
 	const positions = new Map<number, number[]>();
 	const points = new Map<number, number[]>();
+	const goalsFor = new Map<number, number[]>();
+	const goalsAgainst = new Map<number, number[]>();
 	for (const c of input.clubs) {
 		positions.set(c.clubId, []);
 		points.set(c.clubId, []);
+		goalsFor.set(c.clubId, []);
+		goalsAgainst.set(c.clubId, []);
 	}
 	for (let i = 0; i < n; i++) {
 		const { results, state } = simulateSeasonDetailed(
@@ -359,6 +415,18 @@ export function simulateSeasons(
 			positions.get(row.clubId)?.push(row.position);
 			points.get(row.clubId)?.push(row.points);
 		}
+		const gf = new Map<number, number>();
+		const ga = new Map<number, number>();
+		for (const r of results) {
+			gf.set(r.homeClubId, (gf.get(r.homeClubId) ?? 0) + r.homeGoals);
+			ga.set(r.homeClubId, (ga.get(r.homeClubId) ?? 0) + r.awayGoals);
+			gf.set(r.awayClubId, (gf.get(r.awayClubId) ?? 0) + r.awayGoals);
+			ga.set(r.awayClubId, (ga.get(r.awayClubId) ?? 0) + r.homeGoals);
+		}
+		for (const c of input.clubs) {
+			goalsFor.get(c.clubId)?.push(gf.get(c.clubId) ?? 0);
+			goalsAgainst.get(c.clubId)?.push(ga.get(c.clubId) ?? 0);
+		}
 	}
 	const stats = Object.fromEntries(
 		STAT_KEYS.map((k) => [
@@ -366,25 +434,39 @@ export function simulateSeasons(
 			n > 0 ? perSeason.reduce((s, x) => s + x[k], 0) / n : 0,
 		]),
 	) as LeagueStats;
-	return { stats, perSeason, positions, points };
+	return { stats, perSeason, positions, points, goalsFor, goalsAgainst };
 }
 
-/** Best eleven made only of players outside the best eleven (an evidently bad lineup). */
-export function reserveEleven(squad: PlayerAttributes[]): PlayerAttributes[] {
-	const ids = new Set(bestEleven(squad).map((p) => p.playerId));
-	return bestEleven(squad.filter((p) => !ids.has(p.playerId)));
+/** Best eleven for the tactic's formation made only of players outside the best eleven (an evidently bad lineup). */
+export function reserveEleven(
+	squad: PlayerAttributes[],
+	_round = 0,
+	tactic: Tactic = DEFAULT_TACTIC,
+): PlayerAttributes[] {
+	const ids = new Set(
+		bestElevenInSlotOrder(squad, tactic).map((p) => p.playerId),
+	);
+	return bestElevenInSlotOrder(
+		squad.filter((p) => !ids.has(p.playerId)),
+		tactic,
+	);
 }
 
 /** Best eleven after removing the `drop` highest-overall members of the best eleven. */
 export function weakenedEleven(
 	squad: PlayerAttributes[],
+	_round = 0,
+	tactic: Tactic = DEFAULT_TACTIC,
 	drop = 3,
 ): PlayerAttributes[] {
-	const top = [...bestEleven(squad)]
+	const top = [...bestElevenInSlotOrder(squad, tactic)]
 		.sort((a, b) => b.overall - a.overall || a.playerId - b.playerId)
 		.slice(0, drop);
 	const ids = new Set(top.map((p) => p.playerId));
-	return bestEleven(squad.filter((p) => !ids.has(p.playerId)));
+	return bestElevenInSlotOrder(
+		squad.filter((p) => !ids.has(p.playerId)),
+		tactic,
+	);
 }
 
 const mean = (xs: number[]) =>

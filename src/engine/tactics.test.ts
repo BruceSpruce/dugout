@@ -124,8 +124,8 @@ describe("teamRatings", () => {
 			i === 10 ? { ...x, player: null } : x,
 		);
 		const r = teamRatings(slots, { formation: "4-3-3", style: "balanced" });
-		expect(r.attack).toBeCloseTo(((70 + 1.5) * 10) / 11, 9);
-		expect(r.defense).toBeCloseTo(((70 - 1.5) * 10) / 11, 9);
+		expect(r.attack).toBeCloseTo(((70 + 2.4) * 10) / 11, 9);
+		expect(r.defense).toBeCloseTo(((70 - 2.4) * 10) / 11, 9);
 	});
 });
 

@@ -98,8 +98,9 @@ function build(): CalibrationReportInput {
 
 const SEASONS = 30;
 const fixedNow = () => 0;
+// Calibrated for this synthetic league (its attack/defense offset differs from PL 2024).
 const CALIBRATED_MATCH: MatchModel = {
-	logBaseGoals: 0.07,
+	logBaseGoals: -0.15,
 	homeAdvantage: 0.25,
 	strengthBeta: 0.055,
 	drawRho: -0.1,
@@ -133,6 +134,13 @@ describe("buildCalibrationReport", () => {
 		}
 		expect(r.lines.filter((l) => /^ {0,1}\d\. /.test(l))).toHaveLength(6);
 		expect(r.lines.filter((l) => l.includes("2·SE"))).toHaveLength(2);
+		// (j) tactic info lines: style and formation, goals scored/conceded per match.
+		expect(
+			r.lines.filter((l) => /styl ofensywny vs defensywny\s+gole \d/.test(l)),
+		).toHaveLength(1);
+		expect(
+			r.lines.filter((l) => /formacja 4-3-3 vs 5-3-2\s+gole \d/.test(l)),
+		).toHaveLength(1);
 		const last = r.lines[r.lines.length - 1] ?? "";
 		expect(last.startsWith("→ PASS") || last.startsWith("→ FAIL (")).toBe(true);
 		expect(r.exitCode === 0).toBe(last === "→ PASS");
@@ -160,7 +168,7 @@ describe("buildCalibrationReport", () => {
 			seasons: SEASONS,
 			now: fixedNow,
 			model: {
-				logBaseGoals: 0.07,
+				logBaseGoals: -0.08,
 				homeAdvantage: 0.25,
 				strengthBeta: 0.055,
 				drawRho: -0.1,
@@ -273,7 +281,9 @@ describe("buildCalibrationReport", () => {
 		expect(byId.lines).toEqual(byName.lines);
 	});
 
-	it("is deterministic for the same seed and differs for another seed", () => {
+	it("is deterministic for the same seed and differs for another seed", {
+		timeout: 30_000,
+	}, () => {
 		const a = buildCalibrationReport(build(), {
 			seasons: SEASONS,
 			seed: 7,

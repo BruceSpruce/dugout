@@ -15,9 +15,13 @@ export type MatchModel = {
 /** Scores 0..MAX_GOALS are modelled per side; the probability mass beyond is negligible. */
 export const MAX_GOALS = 10;
 
-/** Calibrated 2026-11-13 on PL 2024 (100 seasons, seed 1): goals 2.66, home wins 43.9%, draws 24.6%, points std 18.5. */
+/**
+ * Calibrated 2026-11-13 on PL 2024 (100 seasons, seed 1) after the attack/defense ratings (S-06): goals 2.68,
+ * home wins 43.2%, draws 24.7%, points std 18.3. logBaseGoals 0.07 -> -0.08: role-weighted attack exceeds
+ * defense by ~2.8 points on average, which alone lifted goals to 3.11.
+ */
 export const MATCH_MODEL: MatchModel = {
-	logBaseGoals: 0.07,
+	logBaseGoals: -0.08,
 	homeAdvantage: 0.25,
 	strengthBeta: 0.055,
 	drawRho: -0.1,

@@ -17,6 +17,7 @@ import {
 	simulateSeasons,
 	weakenedEleven,
 } from "./season";
+import { DEFAULT_TACTIC, type Tactic } from "./tactics";
 
 let nextId = 1;
 const player = (
@@ -303,6 +304,48 @@ describe("lineupEffect", () => {
 	});
 });
 
+describe("tactics in the season", () => {
+	it("(h) an attacking style scores and concedes more than a defensive one (200 seasons)", () => {
+		const input = fourClubs();
+		const run = (style: Tactic["style"]) => {
+			const r = simulateSeasons(input, 200, 21, {
+				tactics: new Map([[1, { ...DEFAULT_TACTIC, style }]]),
+			});
+			const mean = (m: Map<number, number[]>) => {
+				const xs = m.get(1) ?? [];
+				return xs.reduce((s, x) => s + x, 0) / xs.length;
+			};
+			return { gf: mean(r.goalsFor), ga: mean(r.goalsAgainst) };
+		};
+		const attacking = run("attacking");
+		const defensive = run("defensive");
+		expect(attacking.gf).toBeGreaterThan(defensive.gf);
+		expect(attacking.ga).toBeGreaterThan(defensive.ga);
+	});
+
+	it("(i) the picker receives the club's tactic, default for clubs without one", () => {
+		const input = fourClubs();
+		const seen = new Map<number, Tactic[]>();
+		const spyFor =
+			(clubId: number): LineupPicker =>
+			(squad, _round, tactic) => {
+				seen.set(clubId, [...(seen.get(clubId) ?? []), tactic]);
+				return pickBestEleven(squad, 0, tactic);
+			};
+		const wanted: Tactic = { formation: "4-3-3", style: "attacking" };
+		simulateSeason(input.fixtures, input.squads, createRng(3), {
+			pickers: new Map([
+				[1, spyFor(1)],
+				[2, spyFor(2)],
+			]),
+			tactics: new Map([[1, wanted]]),
+		});
+		expect(seen.get(1)?.length).toBeGreaterThan(0);
+		expect(seen.get(1)?.every((t) => t === wanted)).toBe(true);
+		expect(seen.get(2)?.every((t) => t === DEFAULT_TACTIC)).toBe(true);
+	});
+});
+
 describe("player state in the season", () => {
 	// 4 clubs, exactly 1 match per club per round (6 rounds of 2 matches).
 	const roundsOf2 = () => fourClubs();
@@ -317,8 +360,8 @@ describe("player state in the season", () => {
 			return bestEleven(squad);
 		};
 		const lineups: { round: number; ids: number[] }[] = [];
-		const spy: LineupPicker = (squad, round) => {
-			const l = picker(squad, round);
+		const spy: LineupPicker = (squad, round, tactic) => {
+			const l = picker(squad, round, tactic);
 			lineups.push({ round, ids: l.map((p) => p.playerId) });
 			return l;
 		};
