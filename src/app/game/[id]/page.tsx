@@ -31,6 +31,7 @@ export default async function GamePage({
 		throw e;
 	}
 	const { nextMatch, table, previousRound } = screen;
+	const live = await api.match.view({ gameId });
 
 	return (
 		<main className="flex min-h-screen flex-col items-center gap-8 bg-gradient-to-b from-[#0b3d1f] to-[#071a0e] px-4 py-10 text-white">
@@ -62,6 +63,14 @@ export default async function GamePage({
 				) : (
 					<p>Sezon zakończony</p>
 				)}
+				{nextMatch ? (
+					<Link
+						className="mt-3 inline-block rounded bg-green-500 px-4 py-2 font-bold text-[#071a0e] hover:bg-green-400"
+						href={`/game/${gameId}/mecz`}
+					>
+						{live ? "Wróć do meczu" : "Rozegraj mecz"}
+					</Link>
+				) : null}
 			</section>
 
 			<section className="w-full max-w-3xl">

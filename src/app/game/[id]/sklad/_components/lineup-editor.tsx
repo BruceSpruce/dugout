@@ -14,6 +14,17 @@ import {
 } from "~/engine/tactics";
 import { api } from "~/trpc/react";
 
+type PlayerStatus = {
+	fitness: number;
+	form: number;
+	injuredFor: number;
+	suspendedFor: number;
+	available: boolean;
+	effectiveOverall: number;
+};
+
+type SquadPlayer = PlayerAttributes & { status: PlayerStatus };
+
 type Lineup = {
 	formation: string;
 	style: string;
@@ -81,21 +92,39 @@ function padBench(bench: number[]): (number | null)[] {
 	return Array.from({ length: BENCH_SIZE }, (_, i) => bench[i] ?? null);
 }
 
-function PlayerOptions({
-	squad,
-	role,
-}: {
-	squad: PlayerAttributes[];
-	role?: Role;
-}) {
+const matchesWord = (n: number) =>
+	n === 1
+		? "mecz"
+		: n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)
+			? "mecze"
+			: "meczów";
+
+/** Short absence note ("kontuzja 2 mecze, pauza 1 mecz"); empty when available. */
+function absence(s: PlayerStatus): string {
+	const parts: string[] = [];
+	if (s.injuredFor > 0) {
+		parts.push(`kontuzja ${s.injuredFor} ${matchesWord(s.injuredFor)}`);
+	}
+	if (s.suspendedFor > 0) {
+		parts.push(`pauza ${s.suspendedFor} ${matchesWord(s.suspendedFor)}`);
+	}
+	return parts.join(", ");
+}
+
+function PlayerOptions({ squad, role }: { squad: SquadPlayer[]; role?: Role }) {
 	return GROUPS.map((g) => (
 		<optgroup key={g.position} label={g.label}>
 			{squad
 				.filter((p) => p.position === g.position)
 				.map((p) => (
-					<option key={p.playerId} value={p.playerId}>
+					<option
+						disabled={!p.status.available}
+						key={p.playerId}
+						value={p.playerId}
+					>
 						{p.name} · {p.overall}
 						{role && ROLE_POSITION[role] !== p.position ? " ×0,8" : ""}
+						{p.status.available ? "" : ` (${absence(p.status)})`}
 					</option>
 				))}
 		</optgroup>
@@ -112,7 +141,7 @@ export function LineupEditor({
 	proposal,
 }: {
 	gameId: number;
-	squad: PlayerAttributes[];
+	squad: SquadPlayer[];
 	saved: Lineup | null;
 	proposal: Lineup;
 }) {
@@ -433,6 +462,7 @@ export function LineupEditor({
 								<th className="py-1 pr-2 text-right">BRA</th>
 								<th className="py-1 pr-2 text-right">DYS</th>
 								<th className="py-1 pr-2 text-right">OGL</th>
+								<th className="py-1 pr-2 text-right">Kond.</th>
 								<th className="py-1">Status</th>
 							</tr>
 						</thead>
@@ -445,11 +475,11 @@ export function LineupEditor({
 										: "";
 								return (
 									<tr
-										className={
+										className={`${
 											status === "skład"
 												? "bg-white/20 font-semibold"
 												: "border-t border-white/10"
-										}
+										}${p.status.available ? "" : "text-red-300/80"}`}
 										key={p.playerId}
 									>
 										<td className="py-1 pr-2">{POSITION_LABEL[p.position]}</td>
@@ -475,7 +505,18 @@ export function LineupEditor({
 										<td className="py-1 pr-2 text-right font-bold tabular-nums">
 											{p.overall}
 										</td>
-										<td className="py-1">{status}</td>
+										<td className="py-1 pr-2 text-right tabular-nums">
+											{Math.round(p.status.fitness)}%
+										</td>
+										<td className="py-1">
+											{p.status.available ? (
+												status
+											) : (
+												<span className="font-semibold text-red-300">
+													{absence(p.status)}
+												</span>
+											)}
+										</td>
 									</tr>
 								);
 							})}
