@@ -151,6 +151,9 @@ export async function loadStartInput(
 	};
 }
 
+export const ROUND_MOVED =
+	"Kolejka została już zapisana (gra jest w innej kolejce).";
+
 /**
  * Writes a new live row, overwriting only a finished one. False when a live match already
  * exists (also under a concurrent start).
@@ -175,7 +178,12 @@ export async function insertLiveRow(
 		.onConflictDoUpdate({
 			target: gameLiveMatch.gameId,
 			set: { ...values, updatedAt: sql`now()` },
-			setWhere: eq(gameLiveMatch.status, "finished"),
+			// Only a finished row of an earlier round: a start that read a stale current_round
+			// (concurrent finish) must not replay the round that was just written.
+			setWhere: and(
+				eq(gameLiveMatch.status, "finished"),
+				sql`${gameLiveMatch.round} < excluded.round`,
+			),
 		})
 		.returning({ gameId: gameLiveMatch.gameId });
 	return written.length > 0;
@@ -289,7 +297,13 @@ export async function writeRoundFinish(
 				},
 			});
 	}
-	await db.execute(
-		sql`update dugout_game set current_round = ${finish.nextRound} where id = ${gameId}`,
+	const advanced = await db.execute(
+		sql`update dugout_game set current_round = ${finish.nextRound}
+			where id = ${gameId} and current_round = ${finish.nextRound - 1}
+			returning id`,
 	);
+	if (advanced.length === 0) {
+		// Throwing rolls back the whole finish transaction.
+		throw new Error(ROUND_MOVED);
+	}
 }

@@ -165,6 +165,8 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 	const viewRef = useRef<MatchView | null>(null);
 	viewRef.current = view;
 	const inflight = useRef(false);
+	/** "Do końca" pressed while a tick was in flight: run it when the tick returns. */
+	const pendingTarget = useRef<number | null>(null);
 	const seenInjuries = useRef<Set<string> | null>(null);
 
 	const publish = useCallback(
@@ -209,7 +211,10 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 
 	const run = useCallback(
 		async (toMinute: number) => {
-			if (inflight.current) return;
+			if (inflight.current) {
+				if (toMinute >= FULL_TIME) pendingTarget.current = toMinute;
+				return;
+			}
 			inflight.current = true;
 			setError(null);
 			try {
@@ -223,6 +228,9 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 				);
 			} finally {
 				inflight.current = false;
+				const pending = pendingTarget.current;
+				pendingTarget.current = null;
+				if (pending !== null) void runRef.current(pending);
 			}
 		},
 		[advance, gameId, publish],
@@ -255,6 +263,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 		setError(null);
 		try {
 			await finish.mutateAsync({ gameId });
+			utils.match.view.setData({ gameId }, null);
 			router.push(`/game/${gameId}`);
 			router.refresh();
 		} catch (e) {
@@ -467,6 +476,14 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 												</option>
 											) : null,
 										)}
+										{user.vacancies.map((playerId) => (
+											<option key={playerId} value={playerId}>
+												{view.events.find(
+													(e) => e.kind === "injury" && e.playerId === playerId,
+												)?.playerName ?? "zawodnik"}{" "}
+												(kontuzja)
+											</option>
+										))}
 									</select>
 								</label>
 								<label className="flex flex-col gap-1 text-sm text-green-200">

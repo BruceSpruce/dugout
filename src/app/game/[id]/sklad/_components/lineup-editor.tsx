@@ -479,7 +479,7 @@ export function LineupEditor({
 											status === "skład"
 												? "bg-white/20 font-semibold"
 												: "border-t border-white/10"
-										}${p.status.available ? "" : "text-red-300/80"}`}
+										} ${p.status.available ? "" : "text-red-300/80"}`}
 										key={p.playerId}
 									>
 										<td className="py-1 pr-2">{POSITION_LABEL[p.position]}</td>

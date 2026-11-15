@@ -11,6 +11,7 @@ import {
 	loadStartInput,
 	loadViewContext,
 	lockLiveRow,
+	ROUND_MOVED,
 	updateLiveProgress,
 	writeRoundFinish,
 } from "~/server/game/load-match";
@@ -137,7 +138,13 @@ export const matchRouter = createTRPCRouter({
 				}
 				const finish = finishRound(row);
 				if (!finish.ok) throw bad(finish.error);
-				await writeRoundFinish(tx, input.gameId, finish);
+				try {
+					await writeRoundFinish(tx, input.gameId, finish);
+				} catch (e) {
+					if (e instanceof Error && e.message === ROUND_MOVED)
+						throw bad(ROUND_MOVED);
+					throw e;
+				}
 				return {
 					round: row.round,
 					nextRound: finish.nextRound,
