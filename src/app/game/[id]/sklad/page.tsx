@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { api } from "~/trpc/server";
 import { LineupEditor } from "./_components/lineup-editor";
@@ -17,7 +17,9 @@ export default async function LineupPage({
 	const gameId = Number(id);
 	if (!Number.isSafeInteger(gameId)) notFound();
 
-	await api.match.settle({ gameId });
+	// The AI finished an abandoned match: the round screen shows the notice.
+	const { settled } = await api.match.settle({ gameId });
+	if (settled) redirect(`/game/${gameId}`);
 
 	let data: Awaited<ReturnType<typeof api.game.lineup>>;
 	try {

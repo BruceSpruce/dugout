@@ -208,10 +208,11 @@ export const matchRouter = createTRPCRouter({
 					return { settled: true };
 				});
 			} catch (e) {
-				if (e instanceof TRPCError && e.message === ROUND_MOVED) {
-					return { settled: false };
+				// Called while rendering the game pages: never let a failed settle break them.
+				if (!(e instanceof TRPCError && e.message === ROUND_MOVED)) {
+					console.error("match.settle failed", input.gameId, e);
 				}
-				throw e;
+				return { settled: false };
 			}
 		}),
 });

@@ -159,6 +159,8 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 	const [notice, setNotice] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [confirmExit, setConfirmExit] = useState(false);
+	/** Potwierdź pressed: disables both buttons until exit fails (double click guard). */
+	const [exitStarted, setExitStarted] = useState(false);
 	const [outId, setOutId] = useState("");
 	const [inId, setInId] = useState("");
 	const [formation, setFormation] = useState<FormationId>("4-4-2");
@@ -280,6 +282,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 
 	const onExit = async () => {
 		setError(null);
+		setExitStarted(true);
 		exiting.current = true;
 		setPlaying(false);
 		pendingTarget.current = null;
@@ -293,6 +296,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 			router.refresh();
 		} catch (e) {
 			exiting.current = false;
+			setExitStarted(false);
 			setConfirmExit(false);
 			setError(e instanceof Error ? e.message : "Nie udało się wyjść z meczu");
 		}
@@ -360,8 +364,13 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 
 	const user = view.userSide ? view[view.userSide] : null;
 	const ended = view.minute >= FULL_TIME;
+	// An open exit confirmation freezes the match controls (Do końca, subs, tactic).
 	const busy =
-		advance.isPending || change.isPending || finish.isPending || exit.isPending;
+		advance.isPending ||
+		change.isPending ||
+		finish.isPending ||
+		exit.isPending ||
+		confirmExit;
 	const nameOf = (side: "home" | "away" | null) =>
 		side ? view[side].name : "";
 
@@ -415,7 +424,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 							))}
 							<button
 								className={btn}
-								disabled={advance.isPending}
+								disabled={advance.isPending || confirmExit}
 								onClick={() => {
 									setPlaying(false);
 									setNotice(null);
@@ -430,7 +439,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 									AI dogra mecz i zapisze kolejkę —
 									<button
 										className={btnActive}
-										disabled={exit.isPending}
+										disabled={exitStarted}
 										onClick={() => void onExit()}
 										type="button"
 									>
@@ -438,7 +447,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 									</button>
 									<button
 										className={btn}
-										disabled={exit.isPending}
+										disabled={exitStarted}
 										onClick={() => setConfirmExit(false)}
 										type="button"
 									>
@@ -448,6 +457,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 							) : (
 								<button
 									className={btn}
+									disabled={busy}
 									onClick={() => {
 										setPlaying(false);
 										setNotice(null);
