@@ -329,12 +329,15 @@ function fallbackApi(opts: { rowMinutes?: number } = {}) {
 	return { calls, fetchImpl };
 }
 
+// The per-match lineup fallback is opt-in.
+const withFallback = { ...base, fixtureFallback: true };
+
 describe("fetchSeason fallback for teams above maxPage", () => {
 	it("fetches fixtures' lineups, then only players absent from pages 1..maxPage", async () => {
 		const { calls, fetchImpl } = fallbackApi();
 		const client = createClient({ apiKey: "k", fetchImpl, maxRequests: 100 });
 
-		const r = await fetchSeason({ ...base, dataDir: dir, client });
+		const r = await fetchSeason({ ...withFallback, dataDir: dir, client });
 
 		expect(r.fallbackTeams).toBe(1);
 		expect(r.missingAfter).toEqual([]);
@@ -357,16 +360,11 @@ describe("fetchSeason fallback for teams above maxPage", () => {
 		expect(files).not.toContain("team-40-fixture-102.json");
 	});
 
-	it("with fixtureFallback off fetches squads only: no lineups, no single players, complete", async () => {
+	it("by default fetches squads only: no lineups, no single players, complete", async () => {
 		const { calls, fetchImpl } = fallbackApi();
 		const client = createClient({ apiKey: "k", fetchImpl, maxRequests: 100 });
 
-		const r = await fetchSeason({
-			...base,
-			dataDir: dir,
-			client,
-			fixtureFallback: false,
-		});
+		const r = await fetchSeason({ ...base, dataDir: dir, client });
 
 		expect(r.fallbackTeams).toBe(0);
 		expect(r.missingAfter).toEqual([]);
@@ -386,7 +384,7 @@ describe("fetchSeason fallback for teams above maxPage", () => {
 			fetchImpl: first.fetchImpl,
 			maxRequests: 6,
 		});
-		const r1 = await fetchSeason({ ...base, dataDir: dir, client: c1 });
+		const r1 = await fetchSeason({ ...withFallback, dataDir: dir, client: c1 });
 		expect(r1.missingAfter).toEqual([
 			"players/team-33-fixture-101.json",
 			"players/team-40-page-001.json",
@@ -399,7 +397,7 @@ describe("fetchSeason fallback for teams above maxPage", () => {
 			fetchImpl: second.fetchImpl,
 			maxRequests: 100,
 		});
-		const r2 = await fetchSeason({ ...base, dataDir: dir, client: c2 });
+		const r2 = await fetchSeason({ ...withFallback, dataDir: dir, client: c2 });
 		expect(r2.missingAfter).toEqual([]);
 		expect(second.calls.filter((c) => c.includes("id="))).toHaveLength(2);
 
@@ -409,7 +407,7 @@ describe("fetchSeason fallback for teams above maxPage", () => {
 			fetchImpl: third.fetchImpl,
 			maxRequests: 100,
 		});
-		const r3 = await fetchSeason({ ...base, dataDir: dir, client: c3 });
+		const r3 = await fetchSeason({ ...withFallback, dataDir: dir, client: c3 });
 		expect(r3.requested).toBe(0);
 		expect(third.calls).toHaveLength(0);
 	});
@@ -436,7 +434,7 @@ describe("fetchSeason fallback for teams above maxPage", () => {
 			return fetchImpl(url);
 		}) as unknown as typeof fetch;
 		const r = await fetchSeason({
-			...base,
+			...withFallback,
 			dataDir: dir,
 			client: createClient({
 				apiKey: "k",
@@ -461,7 +459,7 @@ describe("fetchSeason fallback for teams above maxPage", () => {
 		const { calls, fetchImpl } = fallbackApi({ rowMinutes: 330 });
 		const client = createClient({ apiKey: "k", fetchImpl, maxRequests: 100 });
 
-		const r = await fetchSeason({ ...base, dataDir: dir, client });
+		const r = await fetchSeason({ ...withFallback, dataDir: dir, client });
 
 		expect(r.fallbackTeams).toBe(0);
 		expect(
@@ -474,7 +472,7 @@ describe("fetchSeason fallback for teams above maxPage", () => {
 		const { calls, fetchImpl } = fallbackApi({ rowMinutes: 300 });
 		const client = createClient({ apiKey: "k", fetchImpl, maxRequests: 100 });
 
-		const r = await fetchSeason({ ...base, dataDir: dir, client });
+		const r = await fetchSeason({ ...withFallback, dataDir: dir, client });
 
 		expect(r.fallbackTeams).toBe(1);
 		expect(calls.filter((c) => c.startsWith("/fixtures/players"))).toHaveLength(

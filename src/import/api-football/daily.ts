@@ -78,8 +78,6 @@ export async function runDaily(
 				dataDir: deps.dataDir,
 				client: deps.client,
 				maxPage: deps.maxPage,
-				// Squads and teams only for archive leagues: no per-match lineups.
-				fixtureFallback: entry.load,
 			});
 		} catch (e) {
 			if (e instanceof BudgetExhaustedError) {
