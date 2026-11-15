@@ -6,6 +6,7 @@
 	"scripts": {
 		"attributes:report": "tsx --env-file=.env scripts/attributes-report.ts",
 		"calibration:report": "tsx --env-file=.env scripts/calibration-report.ts",
+		"live:calibration": "tsx --env-file=.env scripts/live-calibration.ts",
 		"build": "next build",
 		"check": "biome check .",
 		"check:unsafe": "biome check --write --unsafe .",

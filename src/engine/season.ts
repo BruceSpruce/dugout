@@ -13,6 +13,7 @@ import {
 	beforeRound,
 	effectiveOverall,
 	freshState,
+	type MatchEvents,
 	matchEvents,
 	type PlayerState,
 	STATE_MODEL,
@@ -115,6 +116,88 @@ export function simulateSeason(
 
 type Prepared = { ratings: Ratings; lineup: PlayerAttributes[] };
 
+export type ClubRound = {
+	ratings: Ratings;
+	/** Picker output in slot order (null = empty slot). */
+	picked: (PlayerAttributes | null)[];
+	/** Picked players (effective copies), empty slots dropped. */
+	lineup: PlayerAttributes[];
+	/** Available squad players as copies with overall = effectiveOverall. */
+	available: PlayerAttributes[];
+	/** Squad players injured at selection time (before the countdown). */
+	injured: number;
+};
+
+/**
+ * Start of a round for a club that plays it: `beforeRound` for every squad player (written to
+ * `states`; missing = freshState), then the picker sees the available players as copies with
+ * overall adjusted for fitness and form. Uses no rng. Shared by the batch season and live rounds.
+ */
+export function prepareClubRound(
+	squad: PlayerAttributes[],
+	states: Map<number, PlayerState>,
+	round: number,
+	tactic: Tactic,
+	picker: LineupPicker = pickBestEleven,
+	stateModel: StateModel = STATE_MODEL,
+): ClubRound {
+	const available: PlayerAttributes[] = [];
+	let injured = 0;
+	for (const p of squad) {
+		const before = states.get(p.playerId) ?? freshState();
+		if (before.injuredFor > 0) injured++;
+		const { state, available: ok } = beforeRound(before, true, stateModel);
+		states.set(p.playerId, state);
+		if (ok) {
+			available.push({
+				...p,
+				overall: effectiveOverall(p, state, stateModel),
+			});
+		}
+	}
+	const picked = picker(available, round, tactic);
+	return {
+		ratings: teamRatings(slotsOf(picked, tactic), tactic),
+		picked,
+		lineup: present(picked),
+		available,
+		injured,
+	};
+}
+
+/**
+ * End of a batch match for one club: match events (6 rng() per lineup player found in
+ * `originals`, in lineup order, drawn on the original attributes) and form from the result,
+ * written to `states`. Returns the events in lineup order.
+ */
+export function afterClubMatch(
+	lineup: PlayerAttributes[],
+	originals: Map<number, PlayerAttributes>,
+	states: Map<number, PlayerState>,
+	round: number,
+	goalsFor: number,
+	goalsAgainst: number,
+	rng: Rng,
+	stateModel: StateModel = STATE_MODEL,
+): MatchEvents[] {
+	const result =
+		goalsFor > goalsAgainst
+			? "win"
+			: goalsFor === goalsAgainst
+				? "draw"
+				: "loss";
+	const events: MatchEvents[] = [];
+	for (const p of lineup) {
+		const original = originals.get(p.playerId);
+		if (!original) continue;
+		const before = states.get(p.playerId) ?? freshState();
+		const ev = matchEvents(original, before, round, rng, stateModel);
+		states.set(p.playerId, updateForm(ev.state, result, stateModel));
+		events.push(ev);
+	}
+	return events;
+}
+
 /**
  * Like `simulateSeason`, plus state statistics. With consequences on, a club's players only get
  * their pre-round recovery / countdown in rounds the club plays; the picker sees available players
@@ -182,33 +265,22 @@ export function simulateSeasonDetailed(
 				lineup: present(picked),
 			};
 		} else {
-			const available: PlayerAttributes[] = [];
-			let injured = 0;
-			for (const p of squad) {
-				originals.set(p.playerId, p);
-				const before = states.get(p.playerId) ?? freshState();
-				if (before.injuredFor > 0) injured++;
-				const { state, available: ok } = beforeRound(before, true, stateModel);
-				states.set(p.playerId, state);
-				if (ok) {
-					available.push({
-						...p,
-						overall: effectiveOverall(p, state, stateModel),
-					});
-				}
-			}
-			const picked = picker(available, round, tactic);
-			const lineup = present(picked);
-			injuredSum += injured;
+			for (const p of squad) originals.set(p.playerId, p);
+			const club = prepareClubRound(
+				squad,
+				states,
+				round,
+				tactic,
+				picker,
+				stateModel,
+			);
+			injuredSum += club.injured;
 			clubRounds++;
-			for (const p of lineup) {
+			for (const p of club.lineup) {
 				fitnessSum += states.get(p.playerId)?.fitness ?? 100;
 				fitnessCount++;
 			}
-			prepared = {
-				ratings: teamRatings(slotsOf(picked, tactic), tactic),
-				lineup,
-			};
+			prepared = { ratings: club.ratings, lineup: club.lineup };
 		}
 		cache.set(clubId, prepared);
 		return prepared;
@@ -219,22 +291,21 @@ export function simulateSeasonDetailed(
 		goalsFor: number,
 		goalsAgainst: number,
 	) => {
-		const result =
-			goalsFor > goalsAgainst
-				? "win"
-				: goalsFor === goalsAgainst
-					? "draw"
-					: "loss";
-		for (const p of cache.get(clubId)?.lineup ?? []) {
-			const original = originals.get(p.playerId);
-			if (!original) continue;
-			const before = states.get(p.playerId) ?? freshState();
-			const ev = matchEvents(original, before, round, rng, stateModel);
+		const events = afterClubMatch(
+			cache.get(clubId)?.lineup ?? [],
+			originals,
+			states,
+			round,
+			goalsFor,
+			goalsAgainst,
+			rng,
+			stateModel,
+		);
+		for (const ev of events) {
 			if (ev.yellow) yellows++;
 			if (ev.red !== "none") reds++;
 			if (ev.injured > 0) injuries++;
 			if (ev.banned > 0) bans++;
-			states.set(p.playerId, updateForm(ev.state, result, stateModel));
 		}
 	};
 	for (const f of ordered) {

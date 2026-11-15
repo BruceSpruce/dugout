@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { PlayerAttributes } from "./attributes";
 import {
+	applyLiveOutcome,
 	beforeRound,
 	effectiveOverall,
+	eventProbabilities,
 	freshState,
 	isAvailable,
 	matchEvents,
@@ -285,5 +287,90 @@ describe("determinizm", () => {
 			if (label === "kontuzja") expect(e.injured).toBeGreaterThan(0);
 			if (label === "czerwona wprost") expect(e.red).toBe("straight");
 		}
+	});
+});
+
+describe("wspolne reguly zdarzen (mecz na zywo)", () => {
+	it("matchEvents bit w bit jak przed wydzieleniem regul (staly seed)", () => {
+		const rng = createRng(2026);
+		let s = freshState();
+		const out: unknown[] = [];
+		for (let r = 1; r <= 400; r++) {
+			const e = matchEvents(player(10 + (r % 80)), s, (r % 38) + 1, rng);
+			out.push(e);
+			s = e.state;
+		}
+		const str = JSON.stringify(out);
+		let h = 0;
+		for (let i = 0; i < str.length; i++) {
+			h = (Math.imul(h, 31) + str.charCodeAt(i)) | 0;
+		}
+		// Golden hash computed with matchEvents from commit 5104c9b (before the extraction).
+		expect(h).toBe(1424526934);
+		expect(s).toEqual({
+			fitness: 0,
+			form: 0,
+			yellowCount: 77,
+			suspendedFor: 5,
+			injuredFor: 21,
+		});
+	});
+
+	it("eventProbabilities zgodne z formula kartek i kontuzji", () => {
+		const p = eventProbabilities(player(20));
+		const factor = Math.exp((STATE_MODEL.disciplineSlope * 30) / 50);
+		expect(p.yellow).toBeCloseTo(STATE_MODEL.yellowBase * factor, 12);
+		expect(p.red).toBeCloseTo(STATE_MODEL.redBase * factor, 12);
+		expect(p.secondYellowShare).toBe(STATE_MODEL.secondYellowShare);
+		expect(p.injury).toBe(STATE_MODEL.injuryRate);
+	});
+
+	it("applyLiveOutcome: koszt kondycji proporcjonalny do minut", () => {
+		const none = { yellow: false, red: "none" as const, injured: 0 };
+		const s = { ...freshState(), fitness: 80 };
+		expect(applyLiveOutcome(s, { ...none, minutes: 90 }, 1).fitness).toBe(
+			80 - STATE_MODEL.fitnessCost,
+		);
+		expect(
+			applyLiveOutcome(s, { ...none, minutes: 30 }, 1).fitness,
+		).toBeCloseTo(80 - STATE_MODEL.fitnessCost / 3, 10);
+		expect(applyLiveOutcome(s, { ...none, minutes: 0 }, 1).fitness).toBe(80);
+	});
+
+	it("applyLiveOutcome: kary jak w matchEvents", () => {
+		const base = { injured: 0, minutes: 90 };
+		const fifth = applyLiveOutcome(
+			{ ...freshState(), yellowCount: 4 },
+			{ ...base, yellow: true, red: "none" },
+			19,
+		);
+		expect(fifth.yellowCount).toBe(5);
+		expect(fifth.suspendedFor).toBe(1);
+		const second = applyLiveOutcome(
+			{ ...freshState(), yellowCount: 4 },
+			{ ...base, yellow: true, red: "second-yellow" },
+			10,
+		);
+		expect(second.yellowCount).toBe(4);
+		expect(second.suspendedFor).toBe(1);
+		const straight = applyLiveOutcome(
+			freshState(),
+			{ ...base, yellow: false, red: "straight" },
+			10,
+		);
+		expect(straight.suspendedFor).toBe(3);
+		const injured = applyLiveOutcome(
+			{ ...freshState(), injuredFor: 5 },
+			{ yellow: false, red: "none", injured: 2, minutes: 20 },
+			10,
+		);
+		expect(injured.injuredFor).toBe(5);
+		expect(
+			applyLiveOutcome(
+				freshState(),
+				{ yellow: false, red: "none", injured: 4, minutes: 20 },
+				10,
+			).injuredFor,
+		).toBe(4);
 	});
 });

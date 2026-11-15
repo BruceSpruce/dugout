@@ -100,7 +100,11 @@ function cardProbability(
 	return Math.min(MAX_CARD_PROBABILITY, Math.max(0, p));
 }
 
-function drawInjuryDuration(rng: Rng, model: StateModel): number {
+/** Injury length in matches from the model buckets; always consumes exactly 2 rng() calls. */
+export function drawInjuryDuration(
+	rng: Rng,
+	model: StateModel = STATE_MODEL,
+): number {
 	const total = model.injuryDurations.reduce((s, d) => s + d.weight, 0);
 	const pick = rng() * total;
 	const u = rng();
@@ -138,19 +142,54 @@ export function matchEvents(
 	rng: Rng,
 	model: StateModel = STATE_MODEL,
 ): MatchEvents {
-	const pYellow = cardProbability(model.yellowBase, player.discipline, model);
-	const pRed = cardProbability(model.redBase, player.discipline, model);
+	const p = eventProbabilities(player, model);
 	const uYellow = rng();
 	const uSecond = rng();
 	const uRed = rng();
 	const uInjury = rng();
 	const duration = drawInjuryDuration(rng, model);
 
-	const yellow = uYellow < pYellow;
+	const yellow = uYellow < p.yellow;
 	let red: RedCard = "none";
-	if (yellow && uSecond < model.secondYellowShare) red = "second-yellow";
-	else if (uRed < pRed) red = "straight";
+	if (yellow && uSecond < p.secondYellowShare) red = "second-yellow";
+	else if (uRed < p.red) red = "straight";
 
+	const injured = uInjury < p.injury ? duration : 0;
+	const after = applyCards(state, yellow, red, round);
+
+	return {
+		state: {
+			...after.state,
+			fitness: Math.max(0, state.fitness - model.fitnessCost),
+			injuredFor: Math.max(state.injuredFor, injured),
+		},
+		yellow,
+		red,
+		injured,
+		banned: after.banned,
+	};
+}
+
+/** Per-match (90 minutes) event probabilities of one player; the same rules drive batch and live matches. */
+export function eventProbabilities(
+	player: PlayerAttributes,
+	model: StateModel = STATE_MODEL,
+): { yellow: number; red: number; secondYellowShare: number; injury: number } {
+	return {
+		yellow: cardProbability(model.yellowBase, player.discipline, model),
+		red: cardProbability(model.redBase, player.discipline, model),
+		secondYellowShare: model.secondYellowShare,
+		injury: model.injuryRate,
+	};
+}
+
+/** Yellow count and bans from one match's cards (a second-yellow dismissal does not count as a yellow). */
+function applyCards(
+	state: PlayerState,
+	yellow: boolean,
+	red: RedCard,
+	round: number,
+): { state: PlayerState; banned: number } {
 	let banned = 0;
 	let yellowCount = state.yellowCount;
 	if (red === "second-yellow") banned = 1;
@@ -159,21 +198,28 @@ export function matchEvents(
 		yellowCount += 1;
 		banned += yellowBan(yellowCount, round);
 	}
-
-	const injured = uInjury < model.injuryRate ? duration : 0;
-
 	return {
-		state: {
-			fitness: Math.max(0, state.fitness - model.fitnessCost),
-			form: state.form,
-			yellowCount,
-			suspendedFor: state.suspendedFor + banned,
-			injuredFor: Math.max(state.injuredFor, injured),
-		},
-		yellow,
-		red,
-		injured,
+		state: { ...state, yellowCount, suspendedFor: state.suspendedFor + banned },
 		banned,
+	};
+}
+
+/**
+ * State after a live match for a player who was on the pitch for `minutes`: fitness drops by
+ * fitnessCost x minutes / 90, cards and injury as in `matchEvents`. Form is updated separately (updateForm).
+ */
+export function applyLiveOutcome(
+	state: PlayerState,
+	outcome: { yellow: boolean; red: RedCard; injured: number; minutes: number },
+	round: number,
+	model: StateModel = STATE_MODEL,
+): PlayerState {
+	const after = applyCards(state, outcome.yellow, outcome.red, round);
+	const minutes = Math.min(90, Math.max(0, outcome.minutes));
+	return {
+		...after.state,
+		fitness: Math.max(0, state.fitness - (model.fitnessCost * minutes) / 90),
+		injuredFor: Math.max(state.injuredFor, outcome.injured),
 	};
 }
 
