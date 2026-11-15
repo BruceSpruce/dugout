@@ -14,6 +14,10 @@ export type FetchSeasonOptions = {
 	client: Client;
 	// Highest /players page requested per team (Free plan limit is 3).
 	maxPage?: number;
+	// Per-match lineups (/fixtures/players) for players beyond maxPage. Default true; off for
+	// archive-only leagues, where squads from pages 1..maxPage are enough and the fallback
+	// would cost up to one request per match.
+	fixtureFallback?: boolean;
 };
 
 export type FetchSeasonResult = {
@@ -142,6 +146,7 @@ export async function fetchSeason(
 ): Promise<FetchSeasonResult> {
 	const { league, season, dataDir, client } = options;
 	const maxPage = options.maxPage ?? 3;
+	const fixtureFallback = options.fixtureFallback ?? true;
 	const root = join(dataDir, String(league), String(season));
 	let requested = 0;
 	let skipped = 0;
@@ -200,7 +205,7 @@ export async function fetchSeason(
 			if (total > maxPage) {
 				// Missing ids are computed against pages 1..maxPage, so all of them must be present.
 				const pagesComplete = pages.length === maxPage;
-				if (!pagesComplete || !fixtures) continue;
+				if (!fixtureFallback || !pagesComplete || !fixtures) continue;
 				// Minutes gap rule: skip the costly fallback when pages 1..maxPage already cover the season.
 				const teamFixtures = fixtureRefs(fixtures).filter(
 					(f) => f.home === teamId || f.away === teamId,

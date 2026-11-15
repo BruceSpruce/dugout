@@ -357,6 +357,27 @@ describe("fetchSeason fallback for teams above maxPage", () => {
 		expect(files).not.toContain("team-40-fixture-102.json");
 	});
 
+	it("with fixtureFallback off fetches squads only: no lineups, no single players, complete", async () => {
+		const { calls, fetchImpl } = fallbackApi();
+		const client = createClient({ apiKey: "k", fetchImpl, maxRequests: 100 });
+
+		const r = await fetchSeason({
+			...base,
+			dataDir: dir,
+			client,
+			fixtureFallback: false,
+		});
+
+		expect(r.fallbackTeams).toBe(0);
+		expect(r.missingAfter).toEqual([]);
+		expect(
+			calls.filter((c) => c.startsWith("/players?") && c.includes("team=33")),
+		).toHaveLength(3);
+		expect(
+			calls.some((c) => c.startsWith("/fixtures/players") || c.includes("id=")),
+		).toBe(false);
+	});
+
 	it("does not request player files until all fixture files exist, then completes, then makes no requests", async () => {
 		const first = fallbackApi();
 		// teams, fixtures, 33/1..3, then only fixture 100 fits

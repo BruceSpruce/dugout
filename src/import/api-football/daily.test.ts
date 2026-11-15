@@ -15,15 +15,17 @@ const now = () => new Date("2026-11-12T00:15:00Z");
 // leagues -> result to return; records call order.
 function fakeFetch(results: Record<number, FetchSeasonResult | "budget">) {
 	const calls: number[] = [];
+	const fallback: Record<number, boolean | undefined> = {};
 	const fetchSeason = async (o: FetchSeasonOptions) => {
 		calls.push(o.league);
+		fallback[o.league] = o.fixtureFallback;
 		const r = results[o.league];
 		if (r === "budget") throw new BudgetExhaustedError(0, "/teams");
 		return (
 			r ?? { requested: 0, skipped: 0, missingAfter: [], fallbackTeams: 0 }
 		);
 	};
-	return { calls, fetchSeason };
+	return { calls, fallback, fetchSeason };
 }
 const done = (requested: number): FetchSeasonResult => ({
 	requested,
@@ -64,7 +66,7 @@ describe("runDaily", () => {
 	});
 
 	it("loads a playable league once it completes, then moves on to the next league", async () => {
-		const { calls, fetchSeason } = fakeFetch({
+		const { calls, fallback, fetchSeason } = fakeFetch({
 			39: done(10),
 			140: partial(80),
 		});
@@ -87,12 +89,17 @@ describe("runDaily", () => {
 
 		expect(calls).toEqual([39, 140]);
 		expect(loads).toEqual([39]);
+		// The playable league keeps the per-match lineup fallback; archive leagues do not.
+		expect(fallback).toEqual({ 39: true, 140: false });
 		expect(r.state["39-2024"]).toMatchObject({ complete: true, loadExit: 0 });
 		expect(r.state["140-2024"]).toEqual({ complete: false });
 	});
 
 	it("skips complete, loaded leagues without fetching and never loads load:false leagues", async () => {
-		const { calls, fetchSeason } = fakeFetch({ 140: done(5), 78: done(5) });
+		const { calls, fallback, fetchSeason } = fakeFetch({
+			140: done(5),
+			78: done(5),
+		});
 		const loads: number[] = [];
 		const state = {
 			"39-2024": {
@@ -115,6 +122,8 @@ describe("runDaily", () => {
 
 		expect(calls).toEqual([140, 78]);
 		expect(loads).toEqual([]);
+		// Archive (load:false) leagues: squads and teams only, no per-match lineups.
+		expect(fallback[140]).toBe(false);
 		expect(r.outcomes[0]?.status).toBe("skipped");
 	});
 
