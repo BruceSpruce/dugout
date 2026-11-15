@@ -17,6 +17,8 @@ export default async function LineupPage({
 	const gameId = Number(id);
 	if (!Number.isSafeInteger(gameId)) notFound();
 
+	await api.match.settle({ gameId });
+
 	let data: Awaited<ReturnType<typeof api.game.lineup>>;
 	try {
 		data = await api.game.lineup({ gameId });

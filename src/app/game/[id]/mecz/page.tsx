@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { api } from "~/trpc/server";
 import { MatchScreen } from "./_components/match-screen";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ export default async function MatchPage({
 	if (!/^[1-9]\d*$/.test(id)) notFound();
 	const gameId = Number(id);
 	if (!Number.isSafeInteger(gameId)) notFound();
+	await api.match.settle({ gameId });
 
 	return (
 		<main className="flex min-h-screen flex-col items-center gap-4 bg-gradient-to-b from-[#0b3d1f] to-[#071a0e] px-4 py-8 text-white">

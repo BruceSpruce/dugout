@@ -150,6 +150,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 	const advance = api.match.advance.useMutation();
 	const change = api.match.change.useMutation();
 	const finish = api.match.finish.useMutation();
+	const exit = api.match.exit.useMutation();
 
 	const view = query.data ?? null;
 	const [tab, setTab] = useState<Tab>("feed");
@@ -157,6 +158,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 	const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
 	const [notice, setNotice] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [confirmExit, setConfirmExit] = useState(false);
 	const [outId, setOutId] = useState("");
 	const [inId, setInId] = useState("");
 	const [formation, setFormation] = useState<FormationId>("4-4-2");
@@ -165,6 +167,8 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 	const viewRef = useRef<MatchView | null>(null);
 	viewRef.current = view;
 	const inflight = useRef(false);
+	/** Exit confirmed: no further ticks may start. */
+	const exiting = useRef(false);
 	/** "Do końca" pressed while a tick was in flight: run it when the tick returns. */
 	const pendingTarget = useRef<number | null>(null);
 	const seenInjuries = useRef<Set<string> | null>(null);
@@ -211,6 +215,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 
 	const run = useCallback(
 		async (toMinute: number) => {
+			if (exiting.current) return;
 			if (inflight.current) {
 				if (toMinute >= FULL_TIME) pendingTarget.current = toMinute;
 				return;
@@ -242,7 +247,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 		if (!playing) return;
 		const t = setInterval(() => {
 			const v = viewRef.current;
-			if (!v || v.minute >= FULL_TIME) return;
+			if (exiting.current || !v || v.minute >= FULL_TIME) return;
 			void runRef.current(v.minute + 1);
 		}, 1000 / speed);
 		return () => clearInterval(t);
@@ -270,6 +275,26 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 			setError(
 				e instanceof Error ? e.message : "Nie udało się zakończyć kolejki",
 			);
+		}
+	};
+
+	const onExit = async () => {
+		setError(null);
+		exiting.current = true;
+		setPlaying(false);
+		pendingTarget.current = null;
+		try {
+			while (inflight.current) {
+				await new Promise((r) => setTimeout(r, 50));
+			}
+			await exit.mutateAsync({ gameId });
+			utils.match.view.setData({ gameId }, null);
+			router.push(`/game/${gameId}`);
+			router.refresh();
+		} catch (e) {
+			exiting.current = false;
+			setConfirmExit(false);
+			setError(e instanceof Error ? e.message : "Nie udało się wyjść z meczu");
 		}
 	};
 
@@ -335,7 +360,8 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 
 	const user = view.userSide ? view[view.userSide] : null;
 	const ended = view.minute >= FULL_TIME;
-	const busy = advance.isPending || change.isPending || finish.isPending;
+	const busy =
+		advance.isPending || change.isPending || finish.isPending || exit.isPending;
 	const nameOf = (side: "home" | "away" | null) =>
 		side ? view[side].name : "";
 
@@ -368,7 +394,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 						<>
 							<button
 								className={playing ? btn : btnActive}
-								disabled={start.isPending}
+								disabled={start.isPending || confirmExit}
 								onClick={() => {
 									setNotice(null);
 									setPlaying((p) => !p);
@@ -399,6 +425,39 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 							>
 								Do końca
 							</button>
+							{confirmExit ? (
+								<span className="flex flex-wrap items-center gap-2 text-sm text-yellow-300">
+									AI dogra mecz i zapisze kolejkę —
+									<button
+										className={btnActive}
+										disabled={exit.isPending}
+										onClick={() => void onExit()}
+										type="button"
+									>
+										Potwierdź
+									</button>
+									<button
+										className={btn}
+										disabled={exit.isPending}
+										onClick={() => setConfirmExit(false)}
+										type="button"
+									>
+										Anuluj
+									</button>
+								</span>
+							) : (
+								<button
+									className={btn}
+									onClick={() => {
+										setPlaying(false);
+										setNotice(null);
+										setConfirmExit(true);
+									}}
+									type="button"
+								>
+									Wyjdź
+								</button>
+							)}
 						</>
 					)}
 				</div>

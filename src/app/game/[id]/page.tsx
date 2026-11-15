@@ -23,6 +23,8 @@ export default async function GamePage({
 	const gameId = Number(id);
 	if (!Number.isSafeInteger(gameId)) notFound();
 
+	await api.match.settle({ gameId });
+
 	let screen: Awaited<ReturnType<typeof api.game.roundScreen>>;
 	try {
 		screen = await api.game.roundScreen({ gameId });
@@ -54,6 +56,13 @@ export default async function GamePage({
 			</div>
 
 			<section className="w-full max-w-3xl rounded-lg bg-white/10 p-4">
+				{screen.aiFinished ? (
+					<p className="mb-3 rounded bg-yellow-400/15 px-3 py-2 text-yellow-300">
+						Mecz dograło AI: {screen.aiFinished.home}{" "}
+						{screen.aiFinished.score.home}–{screen.aiFinished.score.away}{" "}
+						{screen.aiFinished.away} (od {screen.aiFinished.fromMinute}')
+					</p>
+				) : null}
 				<h2 className="mb-2 text-xl font-bold">Najbliższy mecz</h2>
 				{nextMatch ? (
 					<p>
