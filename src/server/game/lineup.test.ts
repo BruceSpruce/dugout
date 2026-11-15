@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import type { PlayerAttributes, Position } from "~/engine/attributes";
-import { aiProposal, sortSquad, validateLineup } from "./lineup";
+import { freshState } from "~/engine/player-state";
+import {
+	aiProposal,
+	matchesWord,
+	sortSquad,
+	squadForRound,
+	unavailableReason,
+	validateLineup,
+} from "./lineup";
 
 const player = (
 	playerId: number,
@@ -142,5 +150,41 @@ describe("sortSquad", () => {
 		);
 		expect(sorted[0]?.playerId).toBe(1);
 		expect(sorted[2]?.playerId).toBe(3);
+	});
+});
+
+describe("squadForRound", () => {
+	it("pomija niedostepnych i liczy effectiveOverall po regeneracji", () => {
+		const states = new Map([
+			[17, { ...freshState(), injuredFor: 2 }],
+			[18, { ...freshState(), suspendedFor: 1 }],
+			[19, { ...freshState(), fitness: 50 }],
+		]);
+		const r = squadForRound(squad, states);
+		expect(r.available.map((p) => p.playerId)).not.toContain(17);
+		expect(r.available.map((p) => p.playerId)).not.toContain(18);
+		const tired = r.withStatus.find((p) => p.playerId === 19);
+		expect(tired?.status.fitness).toBe(59);
+		expect(tired?.status.effectiveOverall).toBeLessThan(81);
+		expect(tired?.overall).toBe(81);
+		const hurt = r.withStatus.find((p) => p.playerId === 17);
+		expect(hurt?.status).toMatchObject({ injuredFor: 2, available: false });
+		expect(aiProposal(r.available, "4-4-2").starters).not.toContain(17);
+	});
+
+	it("komunikat niedostepnosci z odmiana", () => {
+		expect([1, 2, 4, 5, 12, 22, 25].map(matchesWord)).toEqual([
+			"mecz",
+			"mecze",
+			"mecze",
+			"meczów",
+			"meczów",
+			"mecze",
+			"meczów",
+		]);
+		expect(unavailableReason("Kowalski", undefined)).toBeNull();
+		expect(
+			unavailableReason("Kowalski", { ...freshState(), injuredFor: 1 }),
+		).toBe("Kowalski — kontuzja, jeszcze 1 mecz");
 	});
 });

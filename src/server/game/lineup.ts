@@ -1,9 +1,16 @@
-// Lineup logic for the squad screen: `validateLineup` and `aiProposal` are pure, `loadClubSquad`
-// is the thin DB layer (attributes of the game's club for the game's season).
+// Lineup logic for the squad screen: `validateLineup`, `aiProposal` and the availability helpers
+// are pure; `loadClubSquad` / `loadPlayerStates` are the thin DB layer (attributes of the game's
+// club for the game's season, stored player state of the game).
 
 import { sql } from "drizzle-orm";
 
 import { computeAttributes, type PlayerAttributes } from "~/engine/attributes";
+import {
+	beforeRound,
+	effectiveOverall,
+	freshState,
+	type PlayerState,
+} from "~/engine/player-state";
 import {
 	bestElevenFor,
 	FORMATIONS,
@@ -117,6 +124,135 @@ export function aiProposal(
 	return { formation, style: "balanced", starters, bench };
 }
 
+/** Player state for the squad screen: kickoff fitness of the coming round, matches still to miss. */
+export type PlayerStatus = {
+	/** Fitness at the next kickoff (stored fitness + recovery before the round), 0-100. */
+	fitness: number;
+	form: number;
+	/** Club matches still to miss (the coming one included). */
+	injuredFor: number;
+	suspendedFor: number;
+	available: boolean;
+	/** Overall for the coming round (fitness and form applied), one decimal. */
+	effectiveOverall: number;
+};
+
+const round1 = (x: number) => Math.round(x * 10) / 10;
+
+/**
+ * The squad as it enters the coming round: `beforeRound` on the stored state (missing =
+ * freshState), availability judged on the stored state, effectiveOverall on the recovered state
+ * — the same rules as prepareRound / the batch season.
+ */
+export function squadForRound(
+	squad: PlayerAttributes[],
+	states: Map<number, PlayerState>,
+): {
+	/** Every squad player with its status (base attributes unchanged). */
+	withStatus: (PlayerAttributes & { status: PlayerStatus })[];
+	/** Available players only, overall = effectiveOverall (input for aiProposal / teamRatings). */
+	available: PlayerAttributes[];
+	/** Every squad player with overall = effectiveOverall (for ratings of any lineup). */
+	effective: PlayerAttributes[];
+} {
+	const withStatus: (PlayerAttributes & { status: PlayerStatus })[] = [];
+	const available: PlayerAttributes[] = [];
+	const effective: PlayerAttributes[] = [];
+	for (const p of squad) {
+		const stored = states.get(p.playerId) ?? freshState();
+		const { state, available: ok } = beforeRound(stored, true);
+		const overall = effectiveOverall(p, state);
+		withStatus.push({
+			...p,
+			status: {
+				fitness: round1(state.fitness),
+				form: Math.round(state.form * 100) / 100,
+				injuredFor: stored.injuredFor,
+				suspendedFor: stored.suspendedFor,
+				available: ok,
+				effectiveOverall: round1(overall),
+			},
+		});
+		effective.push({ ...p, overall });
+		if (ok) available.push({ ...p, overall });
+	}
+	return { withStatus, available, effective };
+}
+
+/** "mecz" / "mecze" / "meczów" for n. */
+export function matchesWord(n: number): string {
+	if (n === 1) return "mecz";
+	const tens = n % 100;
+	const units = n % 10;
+	if (units >= 2 && units <= 4 && (tens < 12 || tens > 14)) return "mecze";
+	return "meczów";
+}
+
+/** Why a player cannot play the coming round ("X — kontuzja, jeszcze 2 mecze"), null when available. */
+export function unavailableReason(
+	name: string,
+	stored: PlayerState | undefined,
+): string | null {
+	const s = stored ?? freshState();
+	if (s.injuredFor > 0) {
+		return `${name} — kontuzja, jeszcze ${s.injuredFor} ${matchesWord(s.injuredFor)}`;
+	}
+	if (s.suspendedFor > 0) {
+		return `${name} — pauza za kartki, jeszcze ${s.suspendedFor} ${matchesWord(s.suspendedFor)}`;
+	}
+	return null;
+}
+
+/** Rejects injured or suspended starters and bench players (first one found, starters first). */
+export function validateAvailability(
+	lineup: { starters: number[]; bench: number[] },
+	squad: PlayerAttributes[],
+	states: Map<number, PlayerState>,
+): LineupValidation {
+	const byId = new Map(squad.map((p) => [p.playerId, p]));
+	for (const id of [...lineup.starters, ...lineup.bench]) {
+		const reason = unavailableReason(
+			byId.get(id)?.name ?? `#${id}`,
+			states.get(id),
+		);
+		if (reason) {
+			const where = lineup.starters.includes(id) ? "w składzie" : "na ławce";
+			return { ok: false, error: `Niedostępny zawodnik ${where}: ${reason}` };
+		}
+	}
+	return { ok: true };
+}
+
+/** Stored player state of a game (players without a row are fresh). */
+export async function loadPlayerStates(
+	db: Db,
+	gameId: number,
+): Promise<Map<number, PlayerState>> {
+	const rows = await db.execute<{
+		player_id: number;
+		fitness: number;
+		form: number;
+		yellow_count: number;
+		suspended_for: number;
+		injured_for: number;
+	}>(
+		sql`select player_id, fitness, form, yellow_count, suspended_for, injured_for
+			from dugout_game_player_state where game_id = ${gameId}`,
+	);
+	return new Map(
+		rows.map((r) => [
+			r.player_id,
+			{
+				fitness: Number(r.fitness),
+				form: Number(r.form),
+				yellowCount: r.yellow_count,
+				suspendedFor: r.suspended_for,
+				injuredFor: r.injured_for,
+			},
+		]),
+	);
+}
+
 /** Null when the game does not exist or its season is not loaded. */
 export async function loadClubSquad(
 	db: Db,
@@ -124,6 +260,7 @@ export async function loadClubSquad(
 ): Promise<{
 	game: { clubId: number; currentRound: number };
 	squad: PlayerAttributes[];
+	states: Map<number, PlayerState>;
 } | null> {
 	const rows = await db.execute<{
 		club_id: number;
@@ -145,5 +282,6 @@ export async function loadClubSquad(
 	return {
 		game: { clubId: g.club_id, currentRound: g.current_round },
 		squad,
+		states: await loadPlayerStates(db, gameId),
 	};
 }

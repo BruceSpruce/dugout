@@ -9,10 +9,15 @@ import {
 	jsonb,
 	numeric,
 	pgTableCreator,
+	primaryKey,
+	real,
 	text,
 	timestamp,
 	unique,
 } from "drizzle-orm/pg-core";
+
+import type { LiveChange, LiveSetup } from "~/engine/live-match";
+import type { StoredBackground } from "~/server/game/match-flow";
 
 export const createTable = pgTableCreator((name) => `dugout_${name}`);
 
@@ -226,3 +231,51 @@ export const gameLineup = createTable("game_lineup", {
 		.notNull()
 		.defaultNow(),
 });
+
+// Player state between matches per game (cards, bans, injuries, fitness, form). No row = fresh state.
+export const gamePlayerState = createTable(
+	"game_player_state",
+	{
+		gameId: integer("game_id")
+			.notNull()
+			.references(() => game.id, { onDelete: "cascade" }),
+		playerId: integer("player_id")
+			.notNull()
+			.references(() => player.id),
+		fitness: real().notNull(),
+		form: real().notNull(),
+		yellowCount: integer("yellow_count").notNull(),
+		suspendedFor: integer("suspended_for").notNull(),
+		injuredFor: integer("injured_for").notNull(),
+	},
+	(t) => [
+		primaryKey({ columns: [t.gameId, t.playerId] }),
+		index("game_player_state_player_idx").on(t.playerId),
+	],
+);
+
+// The user's match of the current round, replayed from (setup, seed, changes) up to `minute`.
+// One row per game: `start` overwrites a finished row, `finish` flips status to finished.
+export const gameLiveMatch = createTable(
+	"game_live_match",
+	{
+		gameId: integer("game_id")
+			.primaryKey()
+			.references(() => game.id, { onDelete: "cascade" }),
+		fixtureId: integer("fixture_id")
+			.notNull()
+			.references(() => fixture.id),
+		round: integer().notNull(),
+		seed: integer().notNull(),
+		setup: jsonb().$type<LiveSetup>().notNull(),
+		background: jsonb().$type<StoredBackground>().notNull(),
+		changes: jsonb().$type<LiveChange[]>().notNull(),
+		minute: integer().notNull(),
+		// live | finished
+		status: text().notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => [index("game_live_match_fixture_idx").on(t.fixtureId)],
+);

@@ -1,4 +1,5 @@
 import { gameRouter } from "~/server/api/routers/game";
+import { matchRouter } from "~/server/api/routers/match";
 import {
 	createCallerFactory,
 	createTRPCRouter,
@@ -14,6 +15,7 @@ import {
  */
 export const appRouter = createTRPCRouter({
 	game: gameRouter,
+	match: matchRouter,
 	health: publicProcedure.query(() => ({ ok: true as const })),
 });
 

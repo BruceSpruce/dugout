@@ -11,6 +11,8 @@ import {
 	loadClubSquad,
 	STYLE_IDS,
 	sortSquad,
+	squadForRound,
+	validateAvailability,
 	validateLineup,
 } from "~/server/game/lineup";
 import {
@@ -110,10 +112,17 @@ export const gameRouter = createTRPCRouter({
 				})
 				.from(gameLineup)
 				.where(eq(gameLineup.gameId, input.gameId));
+			const round = squadForRound(data.squad, data.states);
+			const order = new Map(
+				sortSquad(data.squad).map((p, i) => [p.playerId, i]),
+			);
 			return {
-				squad: sortSquad(data.squad),
+				// Base attributes plus `status` (kickoff fitness, injury / ban matches, availability).
+				squad: [...round.withStatus].sort(
+					(a, b) => (order.get(a.playerId) ?? 0) - (order.get(b.playerId) ?? 0),
+				),
 				saved: saved ?? null,
-				proposal: aiProposal(data.squad, "4-4-2"),
+				proposal: aiProposal(round.available, "4-4-2"),
 			};
 		}),
 
@@ -124,7 +133,10 @@ export const gameRouter = createTRPCRouter({
 			if (!data) {
 				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
 			}
-			return aiProposal(data.squad, input.formation);
+			return aiProposal(
+				squadForRound(data.squad, data.states).available,
+				input.formation,
+			);
 		}),
 
 	ratings: publicProcedure
@@ -141,7 +153,8 @@ export const gameRouter = createTRPCRouter({
 			if (!data) {
 				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
 			}
-			const byId = new Map(data.squad.map((p) => [p.playerId, p]));
+			const effective = squadForRound(data.squad, data.states).effective;
+			const byId = new Map(effective.map((p) => [p.playerId, p]));
 			const slots = bestElevenFor([], input.formation).map((slot, i) => ({
 				role: slot.role,
 				player: byId.get(input.starters[i] ?? -1) ?? null,
@@ -175,6 +188,10 @@ export const gameRouter = createTRPCRouter({
 			);
 			if (!checked.ok) {
 				throw new TRPCError({ code: "BAD_REQUEST", message: checked.error });
+			}
+			const available = validateAvailability(input, data.squad, data.states);
+			if (!available.ok) {
+				throw new TRPCError({ code: "BAD_REQUEST", message: available.error });
 			}
 			const values = {
 				formation: input.formation,
