@@ -113,6 +113,12 @@ export type LiveChange =
 			kind: "tactic";
 			formation: FormationId;
 			style: Style;
+	  }
+	| {
+			/** From the end of this minute the AI coaches the user's side (exit, abandoned match). */
+			minute: number;
+			by: "ai";
+			kind: "takeover";
 	  };
 
 export type LiveEventKind =
@@ -677,6 +683,8 @@ class Replay {
 		if (side === null) return "W tym meczu nie prowadzisz drużyny.";
 		if (minute >= FULL_TIME) return "Mecz jest zakończony.";
 		const s = this.sideOf(side);
+		if (s.ai) return "Mecz prowadzi AI.";
+		if (change.kind === "takeover") return null;
 		if (change.kind === "tactic") {
 			if (!(change.formation in FORMATIONS)) return "Nieznana formacja.";
 			return null;
@@ -699,6 +707,17 @@ class Replay {
 		const side = this.setup.userSide;
 		if (side === null || this.check(change, minute) !== null) return;
 		const s = this.sideOf(side);
+		if (change.kind === "takeover") {
+			// AI rules from now on; open vacancies are filled at once, within the subs limit. No event.
+			s.ai = true;
+			for (const outId of [...s.vacancies]) {
+				if (this.subsLeft(s) === 0) break;
+				const best = this.bestVacancySlot(s, minute);
+				if (!best) break;
+				this.substitute(s, best.index, outId, best.id, minute, "ai");
+			}
+			return;
+		}
 		if (change.kind === "tactic") {
 			if (change.formation !== s.tactic.formation) {
 				const onPitch = s.slots.flatMap((x) => {
@@ -743,6 +762,20 @@ class Replay {
 		}
 		if (index < 0) return;
 		this.substitute(s, index, change.out, change.in, minute, change.by);
+	}
+
+	/** Empty slot and bench player with the best value in it (ties: first slot, bench order). */
+	bestVacancySlot(
+		s: SideState,
+		minute: number,
+	): { index: number; id: number } | null {
+		let best: { index: number; id: number; value: number } | null = null;
+		for (const [index, slot] of s.slots.entries()) {
+			if (slot.playerId !== null) continue;
+			const b = this.bestFor(s, slot.role, minute);
+			if (b && (!best || b.value > best.value)) best = { index, ...b };
+		}
+		return best && { index: best.index, id: best.id };
 	}
 
 	/** Replays minutes 1..upto; changes are applied at the end of their minute (0 = before kickoff). */
@@ -964,13 +997,7 @@ function bestForVacancy(
 	s: SideState,
 	minute: number,
 ): number | null {
-	let best: { id: number; value: number } | null = null;
-	for (const slot of s.slots) {
-		if (slot.playerId !== null) continue;
-		const b = r.bestFor(s, slot.role, minute);
-		if (b && (!best || b.value > best.value)) best = b;
-	}
-	return best?.id ?? null;
+	return r.bestVacancySlot(s, minute)?.id ?? null;
 }
 
 /** Score of a finished background-style match spread over minutes 1..90 (sorted), from `rng`. */

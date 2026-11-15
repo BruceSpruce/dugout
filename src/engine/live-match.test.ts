@@ -535,3 +535,187 @@ describe("stan po meczu", () => {
 		}
 	});
 });
+
+describe("przejecie meczu przez AI (exit-and-resume, faza 1)", () => {
+	const setup = setupOf(H, A);
+	const takeover = (minute: number): LiveChange => ({
+		minute,
+		by: "ai",
+		kind: "takeover",
+	});
+	const injuries: LiveModel = {
+		...QUIET,
+		state: { ...QUIET.state, injuryRate: 0.3 },
+	};
+	// A deep bench (2 points below the starters): the AI makes fatigue subs from 60'.
+	const DEEP = league(2);
+	const HD = teamOf(DEEP.squads, 10);
+	const AD = teamOf(DEEP.squads, 11);
+	const deep = setupOf(HD, AD);
+	const homeSubs = (r: ReturnType<typeof playLive>) =>
+		r.events.filter((e) => e.kind === "sub" && e.side === "home");
+	const injuredHome = (r: ReturnType<typeof playLive>) =>
+		new Set(
+			r.events
+				.filter((e) => e.kind === "injury" && e.side === "home")
+				.map((e) => e.playerId),
+		);
+
+	it("zdarzenia przed minuta przejecia i inne niz zmiany w tej minucie sa jak bez przejecia; wynik deterministyczny", () => {
+		let checked = 0;
+		for (let seed = 1; seed <= 200; seed++) {
+			const base = playLive(setup, seed, [], 90);
+			for (const m of [30, 70]) {
+				const changes = [takeover(m)];
+				const taken = playLive(setup, seed, changes, 90);
+				const upTo = (r: typeof base) =>
+					r.events.filter(
+						(e) => e.minute < m || (e.minute === m && e.kind !== "sub"),
+					);
+				expect(upTo(taken)).toEqual(upTo(base));
+				expect(
+					taken.events.some((e) => (e.kind as string) === "takeover"),
+				).toBe(false);
+				checked++;
+			}
+		}
+		expect(checked).toBe(400);
+		const a = playLive(setup, 42, [takeover(30)], 90);
+		expect(playLive(setup, 42, [takeover(30)], 90)).toEqual(a);
+	});
+
+	it("po przejeciu AI robi zmiany zmeczonych od 60' po stronie gracza", () => {
+		let fatigue = 0;
+		for (let seed = 1; seed <= 30; seed++) {
+			expect(homeSubs(playLive(deep, seed, [], 90))).toHaveLength(0);
+			const r = playLive(deep, seed, [takeover(30)], 90);
+			const injured = injuredHome(r);
+			const subs = homeSubs(r).filter((e) => !injured.has(e.playerId));
+			for (const e of subs) {
+				expect(e.by).toBe("ai");
+				expect(e.minute).toBeGreaterThanOrEqual(LIVE_MODEL.aiSubFrom);
+			}
+			expect(subs.length).toBeLessThanOrEqual(LIVE_MODEL.aiFatigueSubs);
+			fatigue += subs.length;
+		}
+		expect(fatigue).toBeGreaterThanOrEqual(1);
+	});
+
+	it("po przejeciu kontuzjowany jest zmieniany w tej samej minucie, injuryAutoSubs nic nie dodaje", () => {
+		const firstHomeInjury = (s: number) =>
+			playLive(setup, s, [], 90, injuries).events.find(
+				(e) => e.kind === "injury" && e.side === "home",
+			);
+		const seed = firstSeed((s) => {
+			const i = firstHomeInjury(s);
+			return i !== undefined && i.minute > 5 && i.minute < 85;
+		});
+		const injury = firstHomeInjury(seed);
+		const m = injury?.minute ?? 0;
+		const changes = [takeover(m - 3)];
+		const r = playLive(setup, seed, changes, 90, injuries);
+		expect(
+			r.events.find((e) => e.kind === "injury" && e.side === "home"),
+		).toEqual(injury);
+		const replaced = homeSubs(r).find((e) => e.playerId === injury?.playerId);
+		expect(replaced).toMatchObject({ minute: m, by: "ai" });
+		const at = playLive(setup, seed, changes, m, injuries);
+		expect(at.onPitch.home.filter((s) => s.playerId !== null).length).toBe(11);
+		expect(at.sides.home.vacancies).toEqual([]);
+		expect(injuryAutoSubs(setup, seed, changes, 90, injuries)).toBe(changes);
+	});
+
+	it("wolne miejsce z chwili przejecia jest uzupelnione w minucie przejecia", () => {
+		const seed = firstSeed((s) =>
+			playLive(setup, s, [], 90, injuries).events.some(
+				(e) => e.kind === "injury" && e.side === "home" && e.minute < 80,
+			),
+		);
+		const injury = playLive(setup, seed, [], 90, injuries).events.find(
+			(e) => e.kind === "injury" && e.side === "home",
+		);
+		const k = injury?.minute ?? 0;
+		const id = injury?.playerId ?? 0;
+		const t = k + 3;
+		const changes = [takeover(t)];
+		expect(
+			playLive(setup, seed, changes, t - 1, injuries).sides.home.vacancies,
+		).toContain(id);
+		const at = playLive(setup, seed, changes, t, injuries);
+		expect(at.sides.home.vacancies).toEqual([]);
+		expect(homeSubs(at).find((e) => e.playerId === id)).toMatchObject({
+			minute: t,
+			by: "ai",
+		});
+		expect(at.subsLeft.home).toBeLessThan(LIVE_MODEL.maxSubs);
+		// Injury exactly in the takeover minute: filled at once, nothing left for injuryAutoSubs.
+		const same = [takeover(k)];
+		const atK = playLive(setup, seed, same, k, injuries);
+		expect(atK.sides.home.vacancies).toEqual([]);
+		expect(homeSubs(atK).find((e) => e.playerId === id)).toMatchObject({
+			minute: k,
+			by: "ai",
+		});
+		expect(injuryAutoSubs(setup, seed, same, 90, injuries)).toBe(same);
+	});
+
+	it("limit 5 zmian liczony razem ze zmianami gracza sprzed przejecia", () => {
+		const userSubs = (n: number) =>
+			Array.from({ length: n }, (_, k) =>
+				sub(10 + k, starter(HD, 1 + k), benchAt(HD, k)),
+			);
+		let reachedLimit = 0;
+		for (let seed = 1; seed <= 30; seed++) {
+			const four = playLive(deep, seed, [...userSubs(4), takeover(20)], 90);
+			expect(homeSubs(four).length).toBeLessThanOrEqual(LIVE_MODEL.maxSubs);
+			if (homeSubs(four).length === LIVE_MODEL.maxSubs) {
+				expect(four.subsLeft.home).toBe(0);
+				const last = homeSubs(four).at(-1);
+				// The limit is reached by an AI fatigue sub after the takeover.
+				if (
+					last?.by === "ai" &&
+					last.minute >= LIVE_MODEL.aiSubFrom &&
+					!injuredHome(four).has(last.playerId)
+				) {
+					reachedLimit++;
+				}
+			}
+			const five = playLive(deep, seed, [...userSubs(5), takeover(20)], 90);
+			expect(homeSubs(five)).toHaveLength(LIVE_MODEL.maxSubs);
+			expect(homeSubs(five).every((e) => e.by === "player")).toBe(true);
+		}
+		expect(reachedLimit).toBeGreaterThanOrEqual(1);
+	});
+
+	it("reguly: przejecie przy userSide null, drugie przejecie i zmiana gracza po przejeciu sa odrzucane", () => {
+		expect(validateChange(setup, 1, [], takeover(30))).toEqual({ ok: true });
+		const noUser = validateChange(setupOf(H, A, null), 1, [], takeover(30));
+		expect(noUser.ok).toBe(false);
+		const taken = [takeover(30)];
+		for (const change of [
+			takeover(30),
+			takeover(40),
+			sub(30, starter(H, 9), benchAt(H, 0)),
+			sub(40, starter(H, 9), benchAt(H, 0)),
+			{
+				minute: 40,
+				by: "player",
+				kind: "tactic",
+				formation: "4-3-3",
+				style: "attacking",
+			} as const,
+		]) {
+			const v = validateChange(setup, 1, taken, change);
+			expect(v).toEqual({ ok: false, error: "Mecz prowadzi AI." });
+		}
+		// A stored user change after the takeover is ignored by the replay.
+		const ignored = playLive(
+			setup,
+			1,
+			[...taken, sub(40, starter(H, 9), benchAt(H, 0))],
+			90,
+			QUIET,
+		);
+		expect(homeSubs(ignored).some((e) => e.by === "player")).toBe(false);
+	});
+});
