@@ -1,8 +1,10 @@
 // DB layer for the round screen and the club list: thin SQL, the logic lives in round-screen.ts.
 
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import type { Db } from "~/import/api-football/load";
+import { gameLiveMatch } from "~/server/db/schema";
+import type { LiveStatus } from "./match-flow";
 import type { RoundScreenInput } from "./round-screen";
 
 export const PREMIER_LEAGUE_API_ID = 39;
@@ -75,6 +77,15 @@ export async function loadRoundScreenInput(
 	}>(
 		sql`select fixture_id, home_goals, away_goals from dugout_game_result where game_id = ${gameId}`,
 	);
+	const [live] = await db
+		.select({
+			status: gameLiveMatch.status,
+			round: gameLiveMatch.round,
+			fixtureId: gameLiveMatch.fixtureId,
+			changes: gameLiveMatch.changes,
+		})
+		.from(gameLiveMatch)
+		.where(eq(gameLiveMatch.gameId, gameId));
 
 	return {
 		clubId: g.club_id,
@@ -93,5 +104,13 @@ export async function loadRoundScreenInput(
 			homeGoals: r.home_goals,
 			awayGoals: r.away_goals,
 		})),
+		liveMatch: live
+			? {
+					status: live.status as LiveStatus,
+					round: live.round,
+					fixtureId: live.fixtureId,
+					changes: live.changes,
+				}
+			: null,
 	};
 }

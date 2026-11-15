@@ -5,10 +5,14 @@ import { playLive } from "~/engine/live-match";
 import { freshState, type PlayerState } from "~/engine/player-state";
 import { aiProposal, validateAvailability } from "./lineup";
 import {
+	ABANDON_AFTER_MINUTES,
 	advanceMatch,
+	aiTakeover,
 	applyChange,
+	exitMatch,
 	type FlowFixture,
 	finishRound,
+	isAbandoned,
 	type LiveMatchRow,
 	matchView,
 	type StartInput,
@@ -274,6 +278,58 @@ describe("advanceMatch / applyChange", () => {
 			);
 		}
 		expect(found).toBe(true);
+	});
+});
+
+describe("exitMatch / isAbandoned / aiTakeover", () => {
+	it("wyjscie w 37': minuta 90 i jedno przejecie AI w 37'", () => {
+		const w = world();
+		const row = atMinute(started(baseInput(w)), 37);
+		const r = exitMatch(row);
+		if (!r.ok) throw new Error(r.error);
+		expect(r.minute).toBe(90);
+		const takeovers = r.changes.filter((c) => c.kind === "takeover");
+		expect(takeovers).toEqual([{ minute: 37, by: "ai", kind: "takeover" }]);
+		expect(aiTakeover(r.changes)).toBe(37);
+		const finish = finishRound({
+			...row,
+			minute: r.minute,
+			changes: r.changes,
+		});
+		expect(finish.ok).toBe(true);
+	});
+
+	it("wyjscie w 90': bez przejecia; poza live -> blad", () => {
+		const w = world();
+		const row = atMinute(started(baseInput(w)), 90);
+		const r = exitMatch(row);
+		if (!r.ok) throw new Error(r.error);
+		expect(r.minute).toBe(90);
+		expect(r.changes).toEqual(row.changes);
+		expect(aiTakeover(r.changes)).toBeNull();
+		expect(errorOf(exitMatch({ ...row, status: "finished" }))).toBe(
+			"Mecz nie trwa.",
+		);
+	});
+
+	it("isAbandoned na granicy 30 minut", () => {
+		expect(ABANDON_AFTER_MINUTES).toBe(30);
+		const updatedAt = new Date(Date.UTC(2026, 10, 15, 12, 0, 0));
+		const at = (m: number, s: number) =>
+			new Date(updatedAt.getTime() + (m * 60 + s) * 1000);
+		expect(isAbandoned(updatedAt, at(29, 59))).toBe(false);
+		expect(isAbandoned(updatedAt, at(30, 0))).toBe(true);
+		expect(isAbandoned(updatedAt, at(45, 0))).toBe(true);
+	});
+
+	it("aiTakeover: minuta przejecia albo null", () => {
+		expect(aiTakeover([])).toBeNull();
+		expect(
+			aiTakeover([
+				{ minute: 10, by: "player", kind: "sub", out: 1, in: 2 },
+				{ minute: 55, by: "ai", kind: "takeover" },
+			]),
+		).toBe(55);
 	});
 });
 

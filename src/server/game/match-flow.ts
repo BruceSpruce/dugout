@@ -230,6 +230,40 @@ export function applyChange(
 	return { ok: true, changes: [...row.changes, full] };
 }
 
+// --- exit / abandon ---------------------------------------------------------------------------
+
+/** Minute of the AI takeover of the user's side, null when the user kept coaching. */
+export function aiTakeover(changes: LiveChange[]): number | null {
+	const t = changes.find((c) => c.kind === "takeover");
+	return t ? t.minute : null;
+}
+
+/**
+ * The user leaves the match: the AI takes over at the current minute and the clock goes to 90.
+ * The takeover is appended before the advance, so the AI fills injury vacancies from that minute.
+ * At minute 90 nothing is appended (there is nothing left to coach).
+ */
+export function exitMatch(
+	row: Pick<LiveMatchRow, "setup" | "seed" | "changes" | "minute" | "status">,
+): FlowResult<{ minute: typeof FULL_TIME; changes: LiveChange[] }> {
+	if (row.status !== "live") return fail(NOT_LIVE);
+	const changes: LiveChange[] =
+		row.minute < FULL_TIME && aiTakeover(row.changes) === null
+			? [...row.changes, { minute: row.minute, by: "ai", kind: "takeover" }]
+			: row.changes;
+	const next = advanceMatch({ ...row, changes }, FULL_TIME);
+	if (!next.ok) return next;
+	return { ok: true, minute: FULL_TIME, changes: next.changes };
+}
+
+/** A live match untouched for this long is played out by the AI. */
+export const ABANDON_AFTER_MINUTES = 30;
+
+/** True when the live row was last updated at least ABANDON_AFTER_MINUTES before `now`. */
+export function isAbandoned(updatedAt: Date, now: Date): boolean {
+	return now.getTime() - updatedAt.getTime() >= ABANDON_AFTER_MINUTES * 60_000;
+}
+
 // --- view -------------------------------------------------------------------------------------
 
 export type ClubName = { clubId: number; name: string };

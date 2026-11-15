@@ -1,6 +1,8 @@
 // Round screen model: pure function, no DB. Uses only the game's own results.
 
 import { leagueTable, type TableRow } from "~/engine/club-strength";
+import type { LiveChange } from "~/engine/live-match";
+import { aiTakeover, type LiveStatus } from "./match-flow";
 
 export type RoundScreenInput = {
 	clubId: number;
@@ -15,6 +17,13 @@ export type RoundScreenInput = {
 		awayClubId: number;
 	}[];
 	results: { fixtureId: number; homeGoals: number; awayGoals: number }[];
+	/** The game's game_live_match row (only what the screen needs); null when none. */
+	liveMatch: {
+		status: LiveStatus;
+		round: number;
+		fixtureId: number;
+		changes: LiveChange[];
+	} | null;
 };
 
 export type RoundScreen = {
@@ -38,6 +47,13 @@ export type RoundScreen = {
 			homeGoals: number;
 			awayGoals: number;
 		}[];
+	} | null;
+	/** The user's match of the previous round was played out by the AI (exit or abandoned). */
+	aiFinished: {
+		home: string;
+		away: string;
+		score: { home: number; away: number };
+		fromMinute: number;
 	} | null;
 };
 
@@ -77,6 +93,7 @@ export function buildRoundScreen(input: RoundScreenInput): RoundScreen {
 
 	const previous = currentRound - 1;
 	return {
+		aiFinished: aiFinishedOf(input, nameOf),
 		clubId,
 		clubName: nameOf(clubId),
 		round: currentRound,
@@ -107,5 +124,26 @@ export function buildRoundScreen(input: RoundScreenInput): RoundScreen {
 							})),
 					}
 				: null,
+	};
+}
+
+function aiFinishedOf(
+	input: RoundScreenInput,
+	nameOf: (clubId: number) => string,
+): RoundScreen["aiFinished"] {
+	const live = input.liveMatch;
+	if (live?.status !== "finished" || live.round !== input.currentRound - 1) {
+		return null;
+	}
+	const fromMinute = aiTakeover(live.changes);
+	if (fromMinute === null) return null;
+	const f = input.fixtures.find((x) => x.fixtureId === live.fixtureId);
+	const r = input.results.find((x) => x.fixtureId === live.fixtureId);
+	if (!f || !r) return null;
+	return {
+		home: nameOf(f.homeClubId),
+		away: nameOf(f.awayClubId),
+		score: { home: r.homeGoals, away: r.awayGoals },
+		fromMinute,
 	};
 }

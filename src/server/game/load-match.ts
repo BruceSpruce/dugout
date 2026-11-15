@@ -96,6 +96,29 @@ export async function lockLiveRow(
 	return r ? asRow(r) : null;
 }
 
+/**
+ * Like lockLiveRow, plus the row's updated_at and the database clock (now(), the transaction
+ * start), so the abandon rule does not depend on the app server's clock.
+ */
+export async function lockLiveRowAged(
+	db: DbOrTx,
+	gameId: number,
+): Promise<{ row: LiveMatchRow; updatedAt: Date; dbNow: Date } | null> {
+	const [r] = await db
+		.select({ live: gameLiveMatch, dbNow: sql<string | Date>`now()` })
+		.from(gameLiveMatch)
+		.where(
+			and(eq(gameLiveMatch.gameId, gameId), eq(gameLiveMatch.status, "live")),
+		)
+		.for("update");
+	if (!r) return null;
+	return {
+		row: asRow(r.live),
+		updatedAt: r.live.updatedAt,
+		dbNow: new Date(r.dbNow),
+	};
+}
+
 /** Everything startRound needs except the seed; null when the game or its season is missing. */
 export async function loadStartInput(
 	db: Db,

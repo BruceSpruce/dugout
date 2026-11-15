@@ -37,6 +37,7 @@ const base: RoundScreenInput = {
 	clubs,
 	fixtures,
 	results: [],
+	liveMatch: null,
 };
 
 describe("buildRoundScreen", () => {
@@ -117,5 +118,48 @@ describe("buildRoundScreen", () => {
 		expect(s.nextMatch).toMatchObject({ fixtureId: 5, round: 3, home: true });
 		expect(s.nextMatch?.kickoffAt).toEqual(new Date(Date.UTC(2024, 7, 3)));
 		expect(s.clubId).toBe(1);
+	});
+});
+
+describe("aiFinished", () => {
+	// Round 1 written (fixture 1: Delta 2-1 Alfa), the game is in round 2.
+	const afterRound1: RoundScreenInput = {
+		...base,
+		currentRound: 2,
+		results: [
+			{ fixtureId: 1, homeGoals: 2, awayGoals: 1 },
+			{ fixtureId: 2, homeGoals: 0, awayGoals: 0 },
+		],
+		liveMatch: {
+			status: "finished",
+			round: 1,
+			fixtureId: 1,
+			changes: [
+				{ minute: 20, by: "player", kind: "sub", out: 11, in: 12 },
+				{ minute: 37, by: "ai", kind: "takeover" },
+			],
+		},
+	};
+
+	it("finished previous round with a takeover: clubs, score and takeover minute", () => {
+		expect(buildRoundScreen(afterRound1).aiFinished).toEqual({
+			home: "Delta",
+			away: "Alfa",
+			score: { home: 2, away: 1 },
+			fromMinute: 37,
+		});
+	});
+
+	it("null without a takeover, for a live match, for an older round and without a row", () => {
+		const live = afterRound1.liveMatch;
+		if (!live) throw new Error("fixture");
+		const variants: RoundScreenInput[] = [
+			{ ...afterRound1, liveMatch: { ...live, changes: [] } },
+			{ ...afterRound1, liveMatch: { ...live, status: "live", round: 2 } },
+			{ ...afterRound1, liveMatch: { ...live, status: "live" } },
+			{ ...afterRound1, currentRound: 3 },
+			{ ...afterRound1, liveMatch: null },
+		];
+		for (const v of variants) expect(buildRoundScreen(v).aiFinished).toBeNull();
 	});
 });
