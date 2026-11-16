@@ -35,7 +35,7 @@ export default async function Home() {
 									className="block rounded-lg bg-white/10 p-3 hover:bg-white/20"
 									href={`/game/${g.gameId}`}
 								>
-									{g.clubName} — kolejka {g.currentRound}
+									{g.clubName} — sezon {g.seasonNo}, kolejka {g.currentRound}
 								</Link>
 							</li>
 						))}

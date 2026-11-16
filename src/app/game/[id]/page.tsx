@@ -51,7 +51,8 @@ export default async function GamePage({
 					</Link>
 				</div>
 				<p className="text-green-100">
-					Kolejka {screen.round} / {screen.totalRounds}
+					Sezon {screen.seasonNo} · Kolejka {screen.round} /{" "}
+					{screen.totalRounds}
 				</p>
 			</div>
 
