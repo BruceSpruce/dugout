@@ -1,6 +1,6 @@
 // Guard: player-visible text lives in messages/*.json, not in code. Scans source files of the
-// roots below for Polish diacritics outside comments (string and template literals; JSX text
-// once src/app is added). Tests, fixtures and the owner's CLI reports are excluded.
+// roots below for Polish diacritics outside comments (string and template literals, JSX text
+// in src/app). Tests, fixtures and the owner's CLI reports are excluded.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -10,8 +10,8 @@ import { describe, expect, it } from "vitest";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 
-/** Directories to scan (repo-relative); Phase 3 adds "src/app". */
-const ROOTS = ["src/engine", "src/server"];
+/** Directories to scan (repo-relative). */
+const ROOTS = ["src/engine", "src/server", "src/app"];
 
 /** Owner's CLI reports stay Polish (plan: What We're NOT Doing). */
 const EXCLUDED_FILES = new Set([

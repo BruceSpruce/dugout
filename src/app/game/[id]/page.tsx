@@ -1,17 +1,11 @@
 import { TRPCError } from "@trpc/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getFormatter, getTranslations } from "next-intl/server";
 
 import { api } from "~/trpc/server";
 
 export const dynamic = "force-dynamic";
-
-const formatDate = (d: Date) =>
-	d.toLocaleString("pl-PL", {
-		timeZone: "Europe/Warsaw",
-		dateStyle: "medium",
-		timeStyle: "short",
-	});
 
 export default async function GamePage({
 	params,
@@ -34,12 +28,18 @@ export default async function GamePage({
 	}
 	const { nextMatch, table, previousRound } = screen;
 	const live = await api.match.view({ gameId });
+	const t = await getTranslations("round");
+	const tc = await getTranslations("common");
+	const format = await getFormatter();
+	// Time zone comes from the request config (Europe/Warsaw).
+	const formatDate = (d: Date) =>
+		format.dateTime(d, { dateStyle: "medium", timeStyle: "short" });
 
 	return (
 		<main className="flex min-h-screen flex-col items-center gap-8 bg-gradient-to-b from-[#0b3d1f] to-[#071a0e] px-4 py-10 text-white">
 			<div className="w-full max-w-3xl">
 				<Link className="text-green-200 hover:underline" href="/">
-					← Gry
+					{t("backToGames")}
 				</Link>
 				<div className="mt-2 flex items-center justify-between gap-4">
 					<h1 className="text-3xl font-extrabold">{screen.clubName}</h1>
@@ -49,35 +49,40 @@ export default async function GamePage({
 								className="rounded bg-white/15 px-3 py-1.5 font-semibold hover:bg-white/25"
 								href={`/game/${gameId}/historia`}
 							>
-								Historia
+								{tc("history")}
 							</Link>
 						) : null}
 						<Link
 							className="rounded bg-white/15 px-3 py-1.5 font-semibold hover:bg-white/25"
 							href={`/game/${gameId}/sklad`}
 						>
-							Skład
+							{t("lineup")}
 						</Link>
 					</div>
 				</div>
 				<p className="text-green-100">
-					Sezon {screen.seasonNo} · Kolejka {screen.round} /{" "}
-					{screen.totalRounds}
+					{t("seasonRound", {
+						season: screen.seasonNo,
+						round: screen.round,
+						total: screen.totalRounds,
+					})}
 				</p>
 			</div>
 
 			{screen.lastSeason ? (
 				<section className="w-full max-w-3xl rounded-lg bg-yellow-400/15 p-4 text-yellow-200">
 					<p className="font-semibold">
-						Sezon {screen.lastSeason.seasonNo} zakończony: mistrz{" "}
-						{screen.lastSeason.champion}, Twoje miejsce{" "}
-						{screen.lastSeason.position}
+						{t("seasonOver", {
+							season: screen.lastSeason.seasonNo,
+							champion: screen.lastSeason.champion,
+							position: screen.lastSeason.position,
+						})}
 					</p>
 					<Link
 						className="mt-2 inline-block rounded bg-yellow-400 px-3 py-1.5 font-bold text-[#071a0e] hover:bg-yellow-300"
 						href={`/game/${gameId}/sezon/${screen.lastSeason.seasonNo}`}
 					>
-						Podsumowanie
+						{t("summary")}
 					</Link>
 				</section>
 			) : null}
@@ -85,41 +90,49 @@ export default async function GamePage({
 			<section className="w-full max-w-3xl rounded-lg bg-white/10 p-4">
 				{screen.aiFinished ? (
 					<p className="mb-3 rounded bg-yellow-400/15 px-3 py-2 text-yellow-300">
-						Mecz dograło AI: {screen.aiFinished.home}{" "}
-						{screen.aiFinished.score.home}–{screen.aiFinished.score.away}{" "}
-						{screen.aiFinished.away} (od {screen.aiFinished.fromMinute}')
+						{t("aiFinished", {
+							home: screen.aiFinished.home,
+							homeGoals: screen.aiFinished.score.home,
+							awayGoals: screen.aiFinished.score.away,
+							away: screen.aiFinished.away,
+							minute: screen.aiFinished.fromMinute,
+						})}
 					</p>
 				) : null}
-				<h2 className="mb-2 text-xl font-bold">Najbliższy mecz</h2>
+				<h2 className="mb-2 text-xl font-bold">{t("nextMatch")}</h2>
 				{nextMatch ? (
 					<p>
-						{nextMatch.opponent} ({nextMatch.home ? "u siebie" : "na wyjeździe"}
-						) — {formatDate(nextMatch.kickoffAt)}, kolejka {nextMatch.round}
+						{t("fixture", {
+							opponent: nextMatch.opponent,
+							venue: nextMatch.home ? "home" : "away",
+							date: formatDate(nextMatch.kickoffAt),
+							round: nextMatch.round,
+						})}
 					</p>
 				) : (
-					<p>Sezon zakończony</p>
+					<p>{t("seasonFinished")}</p>
 				)}
 				{nextMatch ? (
 					<Link
 						className="mt-3 inline-block rounded bg-green-500 px-4 py-2 font-bold text-[#071a0e] hover:bg-green-400"
 						href={`/game/${gameId}/mecz`}
 					>
-						{live ? "Wróć do meczu" : "Rozegraj mecz"}
+						{live ? t("backToMatch") : t("playMatch")}
 					</Link>
 				) : null}
 			</section>
 
 			<section className="w-full max-w-3xl">
-				<h2 className="mb-2 text-xl font-bold">Tabela</h2>
+				<h2 className="mb-2 text-xl font-bold">{t("table")}</h2>
 				<table className="w-full text-left text-sm">
 					<thead className="text-green-200">
 						<tr>
-							<th className="py-1 pr-2">#</th>
-							<th className="py-1 pr-2">Klub</th>
-							<th className="py-1 pr-2 text-right">M</th>
-							<th className="py-1 pr-2 text-right">Pkt</th>
-							<th className="py-1 pr-2 text-right">+/−</th>
-							<th className="py-1 text-right">Bramki</th>
+							<th className="py-1 pr-2">{tc("table.position")}</th>
+							<th className="py-1 pr-2">{tc("table.club")}</th>
+							<th className="py-1 pr-2 text-right">{tc("table.played")}</th>
+							<th className="py-1 pr-2 text-right">{tc("table.points")}</th>
+							<th className="py-1 pr-2 text-right">{tc("table.goalDiff")}</th>
+							<th className="py-1 text-right">{tc("table.goals")}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -145,7 +158,7 @@ export default async function GamePage({
 			</section>
 
 			<section className="w-full max-w-3xl">
-				<h2 className="mb-2 text-xl font-bold">Poprzednia kolejka</h2>
+				<h2 className="mb-2 text-xl font-bold">{t("previousRound")}</h2>
 				{previousRound ? (
 					<ul className="flex flex-col gap-1">
 						{previousRound.matches.map((m) => (
@@ -155,7 +168,7 @@ export default async function GamePage({
 						))}
 					</ul>
 				) : (
-					<p>Brak — to pierwsza kolejka</p>
+					<p>{t("noPreviousRound")}</p>
 				)}
 			</section>
 		</main>

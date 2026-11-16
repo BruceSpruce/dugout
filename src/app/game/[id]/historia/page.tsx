@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 
 import { api } from "~/trpc/server";
 
@@ -31,31 +32,33 @@ export default async function HistoryPage({
 		throw e;
 	}
 	const { seasons, allTime, userClubId } = data;
+	const t = await getTranslations("history");
+	const tc = await getTranslations("common");
 
 	return (
 		<main className="flex min-h-screen flex-col items-center gap-8 bg-gradient-to-b from-[#0b3d1f] to-[#071a0e] px-4 py-10 text-white">
 			<div className="w-full max-w-3xl">
 				<Link className="text-green-200 hover:underline" href={`/game/${id}`}>
-					← Kolejka
+					{tc("backToRound")}
 				</Link>
-				<h1 className="mt-2 text-3xl font-extrabold">Historia</h1>
+				<h1 className="mt-2 text-3xl font-extrabold">{t("title")}</h1>
 			</div>
 
 			{seasons.length === 0 ? (
-				<p className="w-full max-w-3xl">Brak zakończonych sezonów.</p>
+				<p className="w-full max-w-3xl">{t("empty")}</p>
 			) : (
 				<>
 					<section className="w-full max-w-3xl">
-						<h2 className="mb-2 text-xl font-bold">Sezony</h2>
+						<h2 className="mb-2 text-xl font-bold">{t("seasons")}</h2>
 						<table className="w-full text-left text-sm">
 							<thead className="text-green-200">
 								<tr>
-									<th className="py-1 pr-2">Sezon</th>
-									<th className="py-1 pr-2">Mistrz</th>
-									<th className="py-1 pr-2 text-right">Twoje miejsce</th>
-									<th className="py-1 pr-2 text-right">Pkt</th>
-									<th className="py-1 pr-2 text-right">W-R-P</th>
-									<th className="py-1 text-right">Bramki</th>
+									<th className="py-1 pr-2">{t("season")}</th>
+									<th className="py-1 pr-2">{t("champion")}</th>
+									<th className="py-1 pr-2 text-right">{t("yourPosition")}</th>
+									<th className="py-1 pr-2 text-right">{tc("table.points")}</th>
+									<th className="py-1 pr-2 text-right">{t("record")}</th>
+									<th className="py-1 text-right">{tc("table.goals")}</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -66,7 +69,7 @@ export default async function HistoryPage({
 												className="text-green-200 hover:underline"
 												href={`/game/${id}/sezon/${s.seasonNo}`}
 											>
-												Sezon {s.seasonNo}
+												{t("seasonLink", { season: s.seasonNo })}
 											</Link>
 										</td>
 										<td className="py-1 pr-2">{s.champion}</td>
@@ -85,20 +88,20 @@ export default async function HistoryPage({
 					</section>
 
 					<section className="w-full max-w-3xl">
-						<h2 className="mb-2 text-xl font-bold">Tabela wszech czasów</h2>
+						<h2 className="mb-2 text-xl font-bold">{t("allTime")}</h2>
 						<table className="w-full text-left text-sm">
 							<thead className="text-green-200">
 								<tr>
-									<th className="py-1 pr-2">#</th>
-									<th className="py-1 pr-2">Klub</th>
-									<th className="py-1 pr-2 text-right">Sezony</th>
-									<th className="py-1 pr-2 text-right">Tytuły</th>
-									<th className="py-1 pr-2 text-right">M</th>
-									<th className="py-1 pr-2 text-right">W</th>
-									<th className="py-1 pr-2 text-right">R</th>
-									<th className="py-1 pr-2 text-right">P</th>
-									<th className="py-1 pr-2 text-right">Bramki</th>
-									<th className="py-1 text-right">Pkt</th>
+									<th className="py-1 pr-2">{tc("table.position")}</th>
+									<th className="py-1 pr-2">{tc("table.club")}</th>
+									<th className="py-1 pr-2 text-right">{t("seasons")}</th>
+									<th className="py-1 pr-2 text-right">{t("titles")}</th>
+									<th className="py-1 pr-2 text-right">{tc("table.played")}</th>
+									<th className="py-1 pr-2 text-right">{tc("table.won")}</th>
+									<th className="py-1 pr-2 text-right">{tc("table.drawn")}</th>
+									<th className="py-1 pr-2 text-right">{tc("table.lost")}</th>
+									<th className="py-1 pr-2 text-right">{tc("table.goals")}</th>
+									<th className="py-1 text-right">{tc("table.points")}</th>
 								</tr>
 							</thead>
 							<tbody>

@@ -5,7 +5,21 @@
 	"common": {
 		"language": "Language",
 		"switchToPl": "Switch to Polish",
-		"switchToEn": "Switch to English"
+		"switchToEn": "Switch to English",
+		"loading": "Loading…",
+		"backToRound": "← Round",
+		"history": "History",
+		"table": {
+			"position": "#",
+			"club": "Club",
+			"played": "P",
+			"won": "W",
+			"drawn": "D",
+			"lost": "L",
+			"goals": "Goals",
+			"goalDiff": "GD",
+			"points": "Pts"
+		}
 	},
 	"errors": {
 		"unknown": "Something went wrong.",
@@ -51,6 +65,161 @@
 		"absence": {
 			"injury": "injury {n, plural, one {# match} other {# matches}}",
 			"suspension": "ban {n, plural, one {# match} other {# matches}}"
+		},
+		"title": "Squad",
+		"formation": "Formation",
+		"style": "Style",
+		"aiProposal": "AI pick",
+		"ratings": "Attack / Defence",
+		"slotAria": "Slot {role} {index}",
+		"bench": "Bench",
+		"benchAria": "Bench {n}",
+		"save": "Save",
+		"saved": "Saved",
+		"mustHaveStarters": "The lineup must have {n} players",
+		"squad": "Players",
+		"col": {
+			"position": "Pos.",
+			"player": "Player",
+			"minutes": "Mins",
+			"attack": "ATT",
+			"creativity": "CRE",
+			"defense": "DEF",
+			"goalkeeping": "GK",
+			"discipline": "DIS",
+			"overall": "OVR",
+			"fitness": "Fit.",
+			"status": "Status"
+		},
+		"status": {
+			"starter": "starting XI",
+			"bench": "bench"
 		}
+	},
+	"labels": {
+		"style": {
+			"attacking": "attacking",
+			"balanced": "balanced",
+			"defensive": "defensive"
+		},
+		"role": {
+			"GK": "GK",
+			"DEF": "DEF",
+			"DM": "DM",
+			"CM": "CM",
+			"AM": "AM",
+			"ST": "ST"
+		},
+		"position": {
+			"Goalkeeper": "GK",
+			"Defender": "DEF",
+			"Midfielder": "MID",
+			"Attacker": "FWD"
+		},
+		"positionGroup": {
+			"Goalkeeper": "Goalkeepers",
+			"Defender": "Defenders",
+			"Midfielder": "Midfielders",
+			"Attacker": "Forwards"
+		}
+	},
+	"home": {
+		"yourGames": "Your games",
+		"gameItem": "{club} — season {season}, round {round}",
+		"newGame": "New game"
+	},
+	"round": {
+		"backToGames": "← Games",
+		"lineup": "Squad",
+		"seasonRound": "Season {season} · Round {round} / {total}",
+		"seasonOver": "Season {season} is over: champions {champion}, your position {position}",
+		"summary": "Summary",
+		"aiFinished": "The AI played out the match: {home} {homeGoals}–{awayGoals} {away} (from {minute}')",
+		"nextMatch": "Next match",
+		"fixture": "{opponent} ({venue, select, home {home} other {away}}) — {date}, round {round}",
+		"seasonFinished": "Season over",
+		"backToMatch": "Back to the match",
+		"playMatch": "Play match",
+		"table": "Table",
+		"previousRound": "Previous round",
+		"noPreviousRound": "None — this is the first round"
+	},
+	"match": {
+		"title": "Match",
+		"noMatch": "No match is in progress.",
+		"startMatch": "Start match",
+		"goToLineup": "Go to the squad",
+		"ended": "Full time",
+		"finishRound": "Finish the round",
+		"pause": "Pause",
+		"kickOff": "Kick off",
+		"resume": "Resume",
+		"toEnd": "To full time",
+		"exitConfirm": "The AI will play out the match and save the round —",
+		"confirm": "Confirm",
+		"cancel": "Cancel",
+		"exit": "Leave",
+		"injuryNotice": "Injury: {player} ({minute}'). Clock stopped: make a substitution in the Line-ups tab, otherwise it will be made automatically.",
+		"playerFallback": "player",
+		"tab": {
+			"feed": "Commentary",
+			"lineups": "Line-ups",
+			"others": "Other matches",
+			"table": "Table"
+		},
+		"noEvents": "No events.",
+		"goalIcon": "GOAL",
+		"event": {
+			"goal": "Goal! {player} ({team})",
+			"yellow": "Yellow card: {player} ({team})",
+			"secondYellow": "Second yellow and red card: {player} ({team})",
+			"red": "Red card: {player} ({team})",
+			"injury": "Injury: {player} ({team})",
+			"sub": "Substitution ({team}): {playerIn} on for {playerOut}{by, select, ai { (automatic)} other {}}",
+			"tactic": "Tactics change ({team}): {formation}, {style}",
+			"halfTime": "Half time",
+			"fullTime": "Full time"
+		},
+		"subOut": "Off",
+		"subIn": "On",
+		"injured": "(injured)",
+		"substitute": "Substitute",
+		"subsLeft": "Substitutions left: {n}",
+		"formation": "Formation",
+		"style": "Style",
+		"applyTactic": "Apply tactics",
+		"changesHint": "Changes take effect from the server's current minute ({minute}'); with the clock running it is best to pause the match first.",
+		"home": "Home",
+		"away": "Away",
+		"emptySlot": "empty slot",
+		"bench": "Bench"
+	},
+	"season": {
+		"title": "Season {season} — summary",
+		"champion": "Champions: {champion}",
+		"yourSeason": "Your season",
+		"position": "Position: {value}",
+		"points": "Points: {value}",
+		"record": "Record (W-D-L): {won}-{drawn}-{lost}",
+		"goals": "Goals: {for}:{against}",
+		"finalTable": "Final table",
+		"leagueStats": "League stats",
+		"matches": "Matches: {value}",
+		"goalsPerMatch": "Goals per match: {value}",
+		"homeWins": "Home wins: {value}%",
+		"draws": "Draws: {value}%",
+		"awayWins": "Away wins: {value}%"
+	},
+	"history": {
+		"title": "History",
+		"empty": "No completed seasons.",
+		"seasons": "Seasons",
+		"season": "Season",
+		"seasonLink": "Season {season}",
+		"champion": "Champions",
+		"yourPosition": "Your position",
+		"record": "W-D-L",
+		"allTime": "All-time table",
+		"titles": "Titles"
 	}
 }

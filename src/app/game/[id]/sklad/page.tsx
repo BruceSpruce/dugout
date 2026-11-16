@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 
 import { api } from "~/trpc/server";
 import { LineupEditor } from "./_components/lineup-editor";
@@ -29,13 +30,16 @@ export default async function LineupPage({
 		throw e;
 	}
 
+	const t = await getTranslations("lineup");
+	const tc = await getTranslations("common");
+
 	return (
 		<main className="flex min-h-screen flex-col items-center gap-6 bg-gradient-to-b from-[#0b3d1f] to-[#071a0e] px-4 py-10 text-white">
 			<div className="w-full max-w-4xl">
 				<Link className="text-green-200 hover:underline" href={`/game/${id}`}>
-					← Kolejka
+					{tc("backToRound")}
 				</Link>
-				<h1 className="mt-2 text-3xl font-extrabold">Skład</h1>
+				<h1 className="mt-2 text-3xl font-extrabold">{t("title")}</h1>
 			</div>
 			<LineupEditor
 				gameId={gameId}

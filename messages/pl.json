@@ -5,7 +5,21 @@
 	"common": {
 		"language": "Język",
 		"switchToPl": "Przełącz na polski",
-		"switchToEn": "Przełącz na angielski"
+		"switchToEn": "Przełącz na angielski",
+		"loading": "Ładowanie…",
+		"backToRound": "← Kolejka",
+		"history": "Historia",
+		"table": {
+			"position": "#",
+			"club": "Klub",
+			"played": "M",
+			"won": "W",
+			"drawn": "R",
+			"lost": "P",
+			"goals": "Bramki",
+			"goalDiff": "+/−",
+			"points": "Pkt"
+		}
 	},
 	"errors": {
 		"unknown": "Coś poszło nie tak.",
@@ -51,6 +65,161 @@
 		"absence": {
 			"injury": "kontuzja {n, plural, one {# mecz} few {# mecze} many {# meczów} other {# meczu}}",
 			"suspension": "pauza {n, plural, one {# mecz} few {# mecze} many {# meczów} other {# meczu}}"
+		},
+		"title": "Skład",
+		"formation": "Formacja",
+		"style": "Styl gry",
+		"aiProposal": "Propozycja AI",
+		"ratings": "Atak / Obrona",
+		"slotAria": "Slot {role} {index}",
+		"bench": "Ławka",
+		"benchAria": "Ławka {n}",
+		"save": "Zapisz",
+		"saved": "Zapisano",
+		"mustHaveStarters": "Skład musi mieć {n} zawodników",
+		"squad": "Kadra",
+		"col": {
+			"position": "Poz.",
+			"player": "Zawodnik",
+			"minutes": "Min",
+			"attack": "ATK",
+			"creativity": "KRE",
+			"defense": "OBR",
+			"goalkeeping": "BRA",
+			"discipline": "DYS",
+			"overall": "OGL",
+			"fitness": "Kond.",
+			"status": "Status"
+		},
+		"status": {
+			"starter": "skład",
+			"bench": "ławka"
 		}
+	},
+	"labels": {
+		"style": {
+			"attacking": "ofensywny",
+			"balanced": "zrównoważony",
+			"defensive": "defensywny"
+		},
+		"role": {
+			"GK": "BR",
+			"DEF": "OBR",
+			"DM": "DP",
+			"CM": "ŚP",
+			"AM": "OP",
+			"ST": "NAP"
+		},
+		"position": {
+			"Goalkeeper": "BR",
+			"Defender": "OBR",
+			"Midfielder": "POM",
+			"Attacker": "NAP"
+		},
+		"positionGroup": {
+			"Goalkeeper": "Bramkarze",
+			"Defender": "Obrońcy",
+			"Midfielder": "Pomocnicy",
+			"Attacker": "Napastnicy"
+		}
+	},
+	"home": {
+		"yourGames": "Twoje gry",
+		"gameItem": "{club} — sezon {season}, kolejka {round}",
+		"newGame": "Nowa gra"
+	},
+	"round": {
+		"backToGames": "← Gry",
+		"lineup": "Skład",
+		"seasonRound": "Sezon {season} · Kolejka {round} / {total}",
+		"seasonOver": "Sezon {season} zakończony: mistrz {champion}, Twoje miejsce {position}",
+		"summary": "Podsumowanie",
+		"aiFinished": "Mecz dograło AI: {home} {homeGoals}–{awayGoals} {away} (od {minute}')",
+		"nextMatch": "Najbliższy mecz",
+		"fixture": "{opponent} ({venue, select, home {u siebie} other {na wyjeździe}}) — {date}, kolejka {round}",
+		"seasonFinished": "Sezon zakończony",
+		"backToMatch": "Wróć do meczu",
+		"playMatch": "Rozegraj mecz",
+		"table": "Tabela",
+		"previousRound": "Poprzednia kolejka",
+		"noPreviousRound": "Brak — to pierwsza kolejka"
+	},
+	"match": {
+		"title": "Mecz",
+		"noMatch": "Żaden mecz nie trwa.",
+		"startMatch": "Rozpocznij mecz",
+		"goToLineup": "Przejdź do składu",
+		"ended": "Koniec",
+		"finishRound": "Zakończ kolejkę",
+		"pause": "Pauza",
+		"kickOff": "Start",
+		"resume": "Wznów",
+		"toEnd": "Do końca",
+		"exitConfirm": "AI dogra mecz i zapisze kolejkę —",
+		"confirm": "Potwierdź",
+		"cancel": "Anuluj",
+		"exit": "Wyjdź",
+		"injuryNotice": "Kontuzja: {player} ({minute}'). Zegar zatrzymany: zrób zmianę w zakładce Składy, inaczej zmiana zostanie wykonana automatycznie.",
+		"playerFallback": "zawodnik",
+		"tab": {
+			"feed": "Relacja",
+			"lineups": "Składy",
+			"others": "Inne mecze",
+			"table": "Tabela"
+		},
+		"noEvents": "Brak zdarzeń.",
+		"goalIcon": "GOL",
+		"event": {
+			"goal": "Gol! {player} ({team})",
+			"yellow": "Żółta kartka: {player} ({team})",
+			"secondYellow": "Druga żółta i czerwona kartka: {player} ({team})",
+			"red": "Czerwona kartka: {player} ({team})",
+			"injury": "Kontuzja: {player} ({team})",
+			"sub": "Zmiana ({team}): {playerIn} za {playerOut}{by, select, ai { (automatyczna)} other {}}",
+			"tactic": "Zmiana taktyki ({team}): {formation}, {style}",
+			"halfTime": "Koniec pierwszej połowy",
+			"fullTime": "Koniec meczu"
+		},
+		"subOut": "Schodzi",
+		"subIn": "Wchodzi",
+		"injured": "(kontuzja)",
+		"substitute": "Zmień",
+		"subsLeft": "Pozostało zmian: {n}",
+		"formation": "Formacja",
+		"style": "Styl gry",
+		"applyTactic": "Zastosuj taktykę",
+		"changesHint": "Zmiany obowiązują od bieżącej minuty serwera ({minute}'); przy działającym zegarze najlepiej najpierw zatrzymać mecz.",
+		"home": "Gospodarze",
+		"away": "Goście",
+		"emptySlot": "wolne miejsce",
+		"bench": "Ławka"
+	},
+	"season": {
+		"title": "Sezon {season} — podsumowanie",
+		"champion": "Mistrz: {champion}",
+		"yourSeason": "Twój sezon",
+		"position": "Miejsce: {value}",
+		"points": "Punkty: {value}",
+		"record": "Bilans (W-R-P): {won}-{drawn}-{lost}",
+		"goals": "Bramki: {for}:{against}",
+		"finalTable": "Tabela końcowa",
+		"leagueStats": "Statystyki ligi",
+		"matches": "Mecze: {value}",
+		"goalsPerMatch": "Gole na mecz: {value}",
+		"homeWins": "Wygrane gospodarzy: {value}%",
+		"draws": "Remisy: {value}%",
+		"awayWins": "Wygrane gości: {value}%"
+	},
+	"history": {
+		"title": "Historia",
+		"empty": "Brak zakończonych sezonów.",
+		"seasons": "Sezony",
+		"season": "Sezon",
+		"seasonLink": "Sezon {season}",
+		"champion": "Mistrz",
+		"yourPosition": "Twoje miejsce",
+		"record": "W-R-P",
+		"allTime": "Tabela wszech czasów",
+		"titles": "Tytuły"
 	}
 }

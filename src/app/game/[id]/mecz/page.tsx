@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 
 import { api } from "~/trpc/server";
 import { MatchScreen } from "./_components/match-screen";
@@ -18,12 +19,13 @@ export default async function MatchPage({
 	// The AI finished an abandoned match: the round screen shows the notice.
 	const { settled } = await api.match.settle({ gameId });
 	if (settled) redirect(`/game/${gameId}`);
+	const tc = await getTranslations("common");
 
 	return (
 		<main className="flex min-h-screen flex-col items-center gap-4 bg-gradient-to-b from-[#0b3d1f] to-[#071a0e] px-4 py-8 text-white">
 			<div className="w-full max-w-4xl">
 				<Link className="text-green-200 hover:underline" href={`/game/${id}`}>
-					← Kolejka
+					{tc("backToRound")}
 				</Link>
 			</div>
 			<MatchScreen gameId={gameId} />

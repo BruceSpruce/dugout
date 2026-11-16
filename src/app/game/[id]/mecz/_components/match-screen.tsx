@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FORMATIONS, type FormationId, type Style } from "~/engine/tactics";
 import { appErrorOf, type ErrorKey, errorText } from "~/i18n/error-text";
+import { isStyle, STYLE_IDS } from "~/i18n/labels";
 import { api, type RouterOutputs } from "~/trpc/react";
 
 type MatchView = NonNullable<RouterOutputs["match"]["view"]>;
@@ -15,26 +16,19 @@ type ViewSide = MatchView["home"];
 
 const FULL_TIME = 90;
 const FORMATION_IDS = Object.keys(FORMATIONS) as FormationId[];
-const STYLES: { id: Style; label: string }[] = [
-	{ id: "attacking", label: "ofensywny" },
-	{ id: "balanced", label: "zrównoważony" },
-	{ id: "defensive", label: "defensywny" },
-];
-const STYLE_LABEL: Record<string, string> = Object.fromEntries(
-	STYLES.map((s) => [s.id, s.label]),
-);
 const SPEEDS = [1, 2, 4] as const;
 
-const TABS = [
-	{ id: "feed", label: "Relacja" },
-	{ id: "lineups", label: "Składy" },
-	{ id: "others", label: "Inne mecze" },
-	{ id: "table", label: "Tabela" },
-] as const;
-type Tab = (typeof TABS)[number]["id"];
+const TABS = ["feed", "lineups", "others", "table"] as const;
+type Tab = (typeof TABS)[number];
 
 const isFormation = (x: string): x is FormationId => x in FORMATIONS;
-const isStyle = (x: string): x is Style => x in STYLE_LABEL;
+
+type MatchT = ReturnType<typeof useTranslations<"match">>;
+type LabelsT = ReturnType<typeof useTranslations<"labels">>;
+
+/** Style label; an unknown style id (not expected from the server) is shown as is. */
+const styleLabel = (tl: LabelsT, style: string | undefined): string =>
+	style && isStyle(style) ? tl(`style.${style}`) : (style ?? "");
 
 const selectClass =
 	"rounded bg-[#071a0e] px-2 py-1 text-sm text-white ring-1 ring-white/20 disabled:opacity-50";
@@ -44,9 +38,10 @@ const btnActive =
 	"rounded bg-green-500 px-3 py-1.5 text-sm font-bold text-[#071a0e]";
 
 function EventIcon({ kind }: { kind: ViewEvent["kind"] }) {
+	const t = useTranslations("match");
 	switch (kind) {
 		case "goal":
-			return <span className="font-bold text-white">GOL</span>;
+			return <span className="font-bold text-white">{t("goalIcon")}</span>;
 		case "yellow":
 			return <span className="inline-block h-3.5 w-2.5 bg-yellow-400" />;
 		case "second-yellow":
@@ -69,40 +64,54 @@ function EventIcon({ kind }: { kind: ViewEvent["kind"] }) {
 	}
 }
 
-function eventText(e: ViewEvent, sideName: string): string {
+/** Feed line of an event, built from the event data in the player's language. */
+function eventText(
+	t: MatchT,
+	tl: LabelsT,
+	e: ViewEvent,
+	sideName: string,
+): string {
+	const player = e.playerName ?? "";
 	switch (e.kind) {
 		case "goal":
-			return `Gol! ${e.playerName ?? ""} (${sideName})`;
+			return t("event.goal", { player, team: sideName });
 		case "yellow":
-			return `Żółta kartka: ${e.playerName ?? ""} (${sideName})`;
+			return t("event.yellow", { player, team: sideName });
 		case "second-yellow":
-			return `Druga żółta i czerwona kartka: ${e.playerName ?? ""} (${sideName})`;
+			return t("event.secondYellow", { player, team: sideName });
 		case "red":
-			return `Czerwona kartka: ${e.playerName ?? ""} (${sideName})`;
+			return t("event.red", { player, team: sideName });
 		case "injury":
-			return `Kontuzja: ${e.playerName ?? ""} (${sideName})`;
+			return t("event.injury", { player, team: sideName });
 		case "sub":
-			return `Zmiana (${sideName}): ${e.inPlayerName ?? "?"} za ${e.playerName ?? "?"}${
-				e.by === "ai" ? " (automatyczna)" : ""
-			}`;
+			return t("event.sub", {
+				team: sideName,
+				playerIn: e.inPlayerName ?? "?",
+				playerOut: e.playerName ?? "?",
+				by: e.by ?? "player",
+			});
 		case "tactic":
-			return `Zmiana taktyki (${sideName}): ${e.formation ?? ""}, ${
-				STYLE_LABEL[e.style ?? ""] ?? e.style ?? ""
-			}`;
+			return t("event.tactic", {
+				team: sideName,
+				formation: e.formation ?? "",
+				style: styleLabel(tl, e.style),
+			});
 		case "half-time":
-			return "Koniec pierwszej połowy";
+			return t("event.halfTime");
 		case "full-time":
-			return "Koniec meczu";
+			return t("event.fullTime");
 	}
 }
 
 function Pitch({ side, title }: { side: ViewSide; title: string }) {
+	const t = useTranslations("match");
+	const tl = useTranslations("labels");
 	return (
 		<div className="rounded-lg bg-white/10 p-3">
 			<h3 className="mb-1 font-bold">
 				{title}: {side.name}{" "}
 				<span className="font-normal text-green-200">
-					({side.tactic.formation}, {STYLE_LABEL[side.tactic.style]})
+					({side.tactic.formation}, {styleLabel(tl, side.tactic.style)})
 				</span>
 			</h3>
 			<ul className="text-sm">
@@ -114,12 +123,12 @@ function Pitch({ side, title }: { side: ViewSide; title: string }) {
 					>
 						<span>
 							<span className="mr-2 inline-block w-8 text-green-200">
-								{s.role}
+								{tl(`role.${s.role}`)}
 							</span>
 							{s.player ? (
 								s.player.name
 							) : (
-								<span className="text-red-300">wolne miejsce</span>
+								<span className="text-red-300">{t("emptySlot")}</span>
 							)}
 						</span>
 						<span className="text-green-100 tabular-nums">
@@ -128,12 +137,14 @@ function Pitch({ side, title }: { side: ViewSide; title: string }) {
 					</li>
 				))}
 			</ul>
-			<div className="mt-2 text-xs text-green-200">Ławka</div>
+			<div className="mt-2 text-xs text-green-200">{t("bench")}</div>
 			<ul className="text-sm">
 				{side.bench.map((p) => (
 					<li className="flex justify-between gap-2" key={p.playerId}>
 						<span>{p.name}</span>
-						<span className="text-green-100 tabular-nums">{p.position}</span>
+						<span className="text-green-100 tabular-nums">
+							{tl(`position.${p.position}`)}
+						</span>
 					</li>
 				))}
 			</ul>
@@ -144,6 +155,8 @@ function Pitch({ side, title }: { side: ViewSide; title: string }) {
 export function MatchScreen({ gameId }: { gameId: number }) {
 	const router = useRouter();
 	const t = useTranslations();
+	const tm = useTranslations("match");
+	const tl = useTranslations("labels");
 	const utils = api.useUtils();
 	const query = api.match.view.useQuery(
 		{ gameId },
@@ -159,7 +172,11 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 	const [tab, setTab] = useState<Tab>("feed");
 	const [playing, setPlaying] = useState(false);
 	const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
-	const [notice, setNotice] = useState<string | null>(null);
+	/** Injury that stopped the clock (translated at render, so it follows the language). */
+	const [notice, setNotice] = useState<{
+		player: string | null;
+		minute: number;
+	} | null>(null);
 	/** The raw error (translated at render) and the text for an error without a code. */
 	const [error, setError] = useState<{
 		cause: unknown;
@@ -208,9 +225,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 		const first = fresh[0];
 		if (first && view.minute < FULL_TIME) {
 			setPlaying(false);
-			setNotice(
-				`Kontuzja: ${first.playerName ?? "zawodnik"} (${first.minute}'). Zegar zatrzymany: zrób zmianę w zakładce Składy, inaczej zmiana zostanie wykonana automatycznie.`,
-			);
+			setNotice({ player: first.playerName ?? null, minute: first.minute });
 			setTab("lineups");
 		}
 	}, [view]);
@@ -322,7 +337,9 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 		}
 	};
 
-	if (query.isLoading) return <p className="text-green-200">Ładowanie…</p>;
+	if (query.isLoading) {
+		return <p className="text-green-200">{t("common.loading")}</p>;
+	}
 	if (query.error) {
 		return <p className="text-red-300">{errorText(t, query.error)}</p>;
 	}
@@ -333,15 +350,15 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 			errorCode === "savedLineupInvalid" || errorCode === "playerUnavailable";
 		return (
 			<section className="flex w-full max-w-4xl flex-col items-start gap-3 rounded-lg bg-white/10 p-6">
-				<h1 className="text-2xl font-extrabold">Mecz</h1>
-				<p>Żaden mecz nie trwa.</p>
+				<h1 className="text-2xl font-extrabold">{tm("title")}</h1>
+				<p>{tm("noMatch")}</p>
 				<button
 					className={btnActive}
 					disabled={start.isPending}
 					onClick={() => void onStart()}
 					type="button"
 				>
-					Rozpocznij mecz
+					{tm("startMatch")}
 				</button>
 				{errorMessage ? (
 					<p className="text-red-300">
@@ -353,7 +370,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 									className="text-green-200 underline"
 									href={`/game/${gameId}/sklad`}
 								>
-									Przejdź do składu
+									{tm("goToLineup")}
 								</Link>
 							</>
 						) : null}
@@ -385,7 +402,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 							{view.score.home} : {view.score.away}
 						</div>
 						<div className="text-green-200 tabular-nums">
-							{ended ? "Koniec" : `${view.minute}'`}
+							{ended ? tm("ended") : `${view.minute}'`}
 						</div>
 					</div>
 					<div className="text-xl font-bold">{view.away.name}</div>
@@ -398,7 +415,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 							onClick={() => void onFinish()}
 							type="button"
 						>
-							Zakończ kolejkę
+							{tm("finishRound")}
 						</button>
 					) : (
 						<>
@@ -411,7 +428,11 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 								}}
 								type="button"
 							>
-								{playing ? "Pauza" : view.minute === 0 ? "Start" : "Wznów"}
+								{playing
+									? tm("pause")
+									: view.minute === 0
+										? tm("kickOff")
+										: tm("resume")}
 							</button>
 							{SPEEDS.map((s) => (
 								<button
@@ -433,18 +454,18 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 								}}
 								type="button"
 							>
-								Do końca
+								{tm("toEnd")}
 							</button>
 							{confirmExit ? (
 								<span className="flex flex-wrap items-center gap-2 text-sm text-yellow-300">
-									AI dogra mecz i zapisze kolejkę —
+									{tm("exitConfirm")}
 									<button
 										className={btnActive}
 										disabled={exitStarted}
 										onClick={() => void onExit()}
 										type="button"
 									>
-										Potwierdź
+										{tm("confirm")}
 									</button>
 									<button
 										className={btn}
@@ -452,7 +473,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 										onClick={() => setConfirmExit(false)}
 										type="button"
 									>
-										Anuluj
+										{tm("cancel")}
 									</button>
 								</span>
 							) : (
@@ -466,14 +487,19 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 									}}
 									type="button"
 								>
-									Wyjdź
+									{tm("exit")}
 								</button>
 							)}
 						</>
 					)}
 				</div>
 				{notice ? (
-					<p className="mt-3 text-center text-yellow-300">{notice}</p>
+					<p className="mt-3 text-center text-yellow-300">
+						{tm("injuryNotice", {
+							player: notice.player ?? tm("playerFallback"),
+							minute: notice.minute,
+						})}
+					</p>
 				) : null}
 				{errorMessage ? (
 					<p className="mt-3 text-center text-red-300">{errorMessage}</p>
@@ -481,18 +507,18 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 			</section>
 
 			<nav className="flex gap-1 border-b border-white/20">
-				{TABS.map((t) => (
+				{TABS.map((id) => (
 					<button
 						className={`px-4 py-2 text-sm font-semibold ${
-							tab === t.id
+							tab === id
 								? "border-b-2 border-green-400 text-white"
 								: "text-green-200 hover:text-white"
 						}`}
-						key={t.id}
-						onClick={() => setTab(t.id)}
+						key={id}
+						onClick={() => setTab(id)}
 						type="button"
 					>
-						{t.label}
+						{tm(`tab.${id}`)}
 					</button>
 				))}
 			</nav>
@@ -500,7 +526,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 			{tab === "feed" ? (
 				<section className="rounded-lg bg-white/10 p-4">
 					{view.events.length === 0 ? (
-						<p className="text-green-200">Brak zdarzeń.</p>
+						<p className="text-green-200">{tm("noEvents")}</p>
 					) : (
 						<ul className="flex flex-col">
 							{view.events.map((e, i) => (
@@ -515,7 +541,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 									<span className="flex w-8 justify-center">
 										<EventIcon kind={e.kind} />
 									</span>
-									<span>{eventText(e, nameOf(e.side))}</span>
+									<span>{eventText(tm, tl, e, nameOf(e.side))}</span>
 								</li>
 							))}
 						</ul>
@@ -529,7 +555,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 						<div className="flex flex-col gap-3 rounded-lg bg-white/10 p-4">
 							<div className="flex flex-wrap items-end gap-3">
 								<label className="flex flex-col gap-1 text-sm text-green-200">
-									Schodzi
+									{tm("subOut")}
 									<select
 										className={selectClass}
 										onChange={(e) => setOutId(e.target.value)}
@@ -550,14 +576,14 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 											<option key={playerId} value={playerId}>
 												{view.events.find(
 													(e) => e.kind === "injury" && e.playerId === playerId,
-												)?.playerName ?? "zawodnik"}{" "}
-												(kontuzja)
+												)?.playerName ?? tm("playerFallback")}{" "}
+												{tm("injured")}
 											</option>
 										))}
 									</select>
 								</label>
 								<label className="flex flex-col gap-1 text-sm text-green-200">
-									Wchodzi
+									{tm("subIn")}
 									<select
 										className={selectClass}
 										onChange={(e) => setInId(e.target.value)}
@@ -566,7 +592,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 										<option value="">—</option>
 										{user.bench.map((p) => (
 											<option key={p.playerId} value={p.playerId}>
-												{p.name} · {p.position}
+												{p.name} · {tl(`position.${p.position}`)}
 											</option>
 										))}
 									</select>
@@ -585,15 +611,15 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 									}
 									type="button"
 								>
-									Zmień
+									{tm("substitute")}
 								</button>
 								<span className="text-sm text-green-200">
-									Pozostało zmian: {user.subsLeft}
+									{tm("subsLeft", { n: user.subsLeft })}
 								</span>
 							</div>
 							<div className="flex flex-wrap items-end gap-3">
 								<label className="flex flex-col gap-1 text-sm text-green-200">
-									Formacja
+									{tm("formation")}
 									<select
 										className={selectClass}
 										onChange={(e) => {
@@ -610,7 +636,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 									</select>
 								</label>
 								<label className="flex flex-col gap-1 text-sm text-green-200">
-									Styl gry
+									{tm("style")}
 									<select
 										className={selectClass}
 										onChange={(e) => {
@@ -618,9 +644,9 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 										}}
 										value={style}
 									>
-										{STYLES.map((s) => (
-											<option key={s.id} value={s.id}>
-												{s.label}
+										{STYLE_IDS.map((id) => (
+											<option key={id} value={id}>
+												{tl(`style.${id}`)}
 											</option>
 										))}
 									</select>
@@ -633,18 +659,17 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 									}
 									type="button"
 								>
-									Zastosuj taktykę
+									{tm("applyTactic")}
 								</button>
 							</div>
 							<p className="text-xs text-green-200">
-								Zmiany obowiązują od bieżącej minuty serwera ({view.minute}');
-								przy działającym zegarze najlepiej najpierw zatrzymać mecz.
+								{tm("changesHint", { minute: view.minute })}
 							</p>
 						</div>
 					) : null}
 					<div className="grid gap-4 sm:grid-cols-2">
-						<Pitch side={view.home} title="Gospodarze" />
-						<Pitch side={view.away} title="Goście" />
+						<Pitch side={view.home} title={tm("home")} />
+						<Pitch side={view.away} title={tm("away")} />
 					</div>
 				</section>
 			) : null}
@@ -673,12 +698,18 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 					<table className="w-full text-left text-sm">
 						<thead className="text-green-200">
 							<tr>
-								<th className="py-1 pr-2">#</th>
-								<th className="py-1 pr-2">Klub</th>
-								<th className="py-1 pr-2 text-right">M</th>
-								<th className="py-1 pr-2 text-right">Pkt</th>
-								<th className="py-1 pr-2 text-right">+/−</th>
-								<th className="py-1 text-right">Bramki</th>
+								<th className="py-1 pr-2">{t("common.table.position")}</th>
+								<th className="py-1 pr-2">{t("common.table.club")}</th>
+								<th className="py-1 pr-2 text-right">
+									{t("common.table.played")}
+								</th>
+								<th className="py-1 pr-2 text-right">
+									{t("common.table.points")}
+								</th>
+								<th className="py-1 pr-2 text-right">
+									{t("common.table.goalDiff")}
+								</th>
+								<th className="py-1 text-right">{t("common.table.goals")}</th>
 							</tr>
 						</thead>
 						<tbody>

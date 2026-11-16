@@ -1,19 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { getFormatter, getTranslations } from "next-intl/server";
 
 import { api } from "~/trpc/server";
 
 export const dynamic = "force-dynamic";
 
 const MAX_INT = 2147483647;
-
-/** Polish decimal format (comma), fixed digits. */
-const num = (v: number, digits: number) =>
-	v.toLocaleString("pl-PL", {
-		minimumFractionDigits: digits,
-		maximumFractionDigits: digits,
-	});
 
 export default async function SeasonSummaryPage({
 	params,
@@ -39,55 +33,70 @@ export default async function SeasonSummaryPage({
 		throw e;
 	}
 	const { user, stats, table, userClubId } = data;
+	const t = await getTranslations("season");
+	const tc = await getTranslations("common");
+	const format = await getFormatter();
+	/** Decimal in the player's language, fixed digits. */
+	const num = (v: number, digits: number) =>
+		format.number(v, {
+			minimumFractionDigits: digits,
+			maximumFractionDigits: digits,
+		});
 
 	return (
 		<main className="flex min-h-screen flex-col items-center gap-8 bg-gradient-to-b from-[#0b3d1f] to-[#071a0e] px-4 py-10 text-white">
 			<div className="w-full max-w-3xl">
 				<div className="flex items-center justify-between gap-4">
 					<Link className="text-green-200 hover:underline" href={`/game/${id}`}>
-						← Kolejka
+						{tc("backToRound")}
 					</Link>
 					<Link
 						className="text-green-200 hover:underline"
 						href={`/game/${id}/historia`}
 					>
-						Historia
+						{tc("history")}
 					</Link>
 				</div>
 				<h1 className="mt-2 text-3xl font-extrabold">
-					Sezon {data.seasonNo} — podsumowanie
+					{t("title", { season: data.seasonNo })}
 				</h1>
-				<p className="text-green-100">Mistrz: {data.champion}</p>
+				<p className="text-green-100">
+					{t("champion", { champion: data.champion })}
+				</p>
 			</div>
 
 			<section className="w-full max-w-3xl rounded-lg bg-white/10 p-4">
-				<h2 className="mb-2 text-xl font-bold">Twój sezon</h2>
+				<h2 className="mb-2 text-xl font-bold">{t("yourSeason")}</h2>
 				<ul className="flex flex-col gap-1">
-					<li>Miejsce: {user.position}</li>
-					<li>Punkty: {user.points}</li>
+					<li>{t("position", { value: user.position })}</li>
+					<li>{t("points", { value: user.points })}</li>
 					<li>
-						Bilans (W-R-P): {user.won}-{user.drawn}-{user.lost}
+						{t("record", {
+							won: user.won,
+							drawn: user.drawn,
+							lost: user.lost,
+						})}
 					</li>
 					<li>
-						Bramki: {user.goalsFor}:{user.goalsAgainst}
+						{t("goals", { for: user.goalsFor, against: user.goalsAgainst })}
 					</li>
 				</ul>
 			</section>
 
 			<section className="w-full max-w-3xl">
-				<h2 className="mb-2 text-xl font-bold">Tabela końcowa</h2>
+				<h2 className="mb-2 text-xl font-bold">{t("finalTable")}</h2>
 				<table className="w-full text-left text-sm">
 					<thead className="text-green-200">
 						<tr>
-							<th className="py-1 pr-2">#</th>
-							<th className="py-1 pr-2">Klub</th>
-							<th className="py-1 pr-2 text-right">M</th>
-							<th className="py-1 pr-2 text-right">W</th>
-							<th className="py-1 pr-2 text-right">R</th>
-							<th className="py-1 pr-2 text-right">P</th>
-							<th className="py-1 pr-2 text-right">Bramki</th>
-							<th className="py-1 pr-2 text-right">+/−</th>
-							<th className="py-1 text-right">Pkt</th>
+							<th className="py-1 pr-2">{tc("table.position")}</th>
+							<th className="py-1 pr-2">{tc("table.club")}</th>
+							<th className="py-1 pr-2 text-right">{tc("table.played")}</th>
+							<th className="py-1 pr-2 text-right">{tc("table.won")}</th>
+							<th className="py-1 pr-2 text-right">{tc("table.drawn")}</th>
+							<th className="py-1 pr-2 text-right">{tc("table.lost")}</th>
+							<th className="py-1 pr-2 text-right">{tc("table.goals")}</th>
+							<th className="py-1 pr-2 text-right">{tc("table.goalDiff")}</th>
+							<th className="py-1 text-right">{tc("table.points")}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -118,13 +127,13 @@ export default async function SeasonSummaryPage({
 			</section>
 
 			<section className="w-full max-w-3xl rounded-lg bg-white/10 p-4">
-				<h2 className="mb-2 text-xl font-bold">Statystyki ligi</h2>
+				<h2 className="mb-2 text-xl font-bold">{t("leagueStats")}</h2>
 				<ul className="flex flex-col gap-1">
-					<li>Mecze: {stats.matches}</li>
-					<li>Gole na mecz: {num(stats.goalsPerMatch, 2)}</li>
-					<li>Wygrane gospodarzy: {num(stats.homeWinPct, 1)}%</li>
-					<li>Remisy: {num(stats.drawPct, 1)}%</li>
-					<li>Wygrane gości: {num(stats.awayWinPct, 1)}%</li>
+					<li>{t("matches", { value: format.number(stats.matches) })}</li>
+					<li>{t("goalsPerMatch", { value: num(stats.goalsPerMatch, 2) })}</li>
+					<li>{t("homeWins", { value: num(stats.homeWinPct, 1) })}</li>
+					<li>{t("draws", { value: num(stats.drawPct, 1) })}</li>
+					<li>{t("awayWins", { value: num(stats.awayWinPct, 1) })}</li>
 				</ul>
 			</section>
 		</main>

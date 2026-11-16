@@ -17,7 +17,7 @@ export function NewGame({ clubs }: { clubs: ClubItem[] }) {
 
 	return (
 		<section className="w-full max-w-4xl">
-			<h2 className="mb-4 text-2xl font-bold">Nowa gra</h2>
+			<h2 className="mb-4 text-2xl font-bold">{t("home.newGame")}</h2>
 			<ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 				{clubs.map((c) => (
 					<li key={c.clubId}>

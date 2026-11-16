@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useMemo, useRef, useState } from "react";
 
 import type { PlayerAttributes, Position } from "~/engine/attributes";
@@ -14,6 +14,7 @@ import {
 	teamRatings,
 } from "~/engine/tactics";
 import { errorText } from "~/i18n/error-text";
+import { isStyle, POSITION_IDS, STYLE_IDS } from "~/i18n/labels";
 import { api } from "~/trpc/react";
 
 type PlayerStatus = {
@@ -39,40 +40,10 @@ const STARTERS_SIZE = 11;
 
 const FORMATION_IDS = Object.keys(FORMATIONS) as FormationId[];
 
-const STYLES: { id: Style; label: string }[] = [
-	{ id: "attacking", label: "ofensywny" },
-	{ id: "balanced", label: "zrównoważony" },
-	{ id: "defensive", label: "defensywny" },
-];
-
-const ROLE_LABEL: Record<Role, string> = {
-	GK: "BR",
-	DEF: "OBR",
-	DM: "DP",
-	CM: "ŚP",
-	AM: "OP",
-	ST: "NAP",
-};
-
-const POSITION_LABEL: Record<Position, string> = {
-	Goalkeeper: "BR",
-	Defender: "OBR",
-	Midfielder: "POM",
-	Attacker: "NAP",
-};
-
-const GROUPS: { position: Position; label: string }[] = [
-	{ position: "Goalkeeper", label: "Bramkarze" },
-	{ position: "Defender", label: "Obrońcy" },
-	{ position: "Midfielder", label: "Pomocnicy" },
-	{ position: "Attacker", label: "Napastnicy" },
-];
+/** Overall multiplier outside the role's position (effectiveSlotOverall). */
+const OFF_POSITION_FACTOR = 0.8;
 
 const isFormation = (x: string): x is FormationId => x in FORMATIONS;
-const isStyle = (x: string): x is Style => STYLES.some((s) => s.id === x);
-
-const fmt = (x: number) =>
-	(Math.round(x * 10) / 10).toFixed(1).replace(".", ",");
 
 /** Slot rows from attack down to the goalkeeper: consecutive equal roles share a row. */
 function pitchRows(formation: FormationId) {
@@ -108,10 +79,12 @@ function absence(t: LineupT, s: PlayerStatus): string {
 
 function PlayerOptions({ squad, role }: { squad: SquadPlayer[]; role?: Role }) {
 	const t = useTranslations("lineup");
-	return GROUPS.map((g) => (
-		<optgroup key={g.position} label={g.label}>
+	const tl = useTranslations("labels");
+	const format = useFormatter();
+	return POSITION_IDS.map((position: Position) => (
+		<optgroup key={position} label={tl(`positionGroup.${position}`)}>
 			{squad
-				.filter((p) => p.position === g.position)
+				.filter((p) => p.position === position)
 				.map((p) => (
 					<option
 						disabled={!p.status.available}
@@ -119,13 +92,27 @@ function PlayerOptions({ squad, role }: { squad: SquadPlayer[]; role?: Role }) {
 						value={p.playerId}
 					>
 						{p.name} · {p.overall}
-						{role && ROLE_POSITION[role] !== p.position ? " ×0,8" : ""}
+						{role && ROLE_POSITION[role] !== p.position
+							? ` ×${format.number(OFF_POSITION_FACTOR)}`
+							: ""}
 						{p.status.available ? "" : ` (${absence(t, p.status)})`}
 					</option>
 				))}
 		</optgroup>
 	));
 }
+
+/** Numeric squad columns between the player name and the status, in display order. */
+const NUMBER_COLUMNS = [
+	"minutes",
+	"attack",
+	"creativity",
+	"defense",
+	"goalkeeping",
+	"discipline",
+	"overall",
+	"fitness",
+] as const;
 
 const selectClass =
 	"w-full rounded bg-[#071a0e]/80 px-1 py-0.5 text-xs text-white ring-1 ring-white/20";
@@ -157,9 +144,18 @@ export function LineupEditor({
 	const [busy, setBusy] = useState(false);
 	const t = useTranslations();
 	const tLineup = useTranslations("lineup");
+	const tl = useTranslations("labels");
+	const format = useFormatter();
+	/** Rating with one decimal in the player's language. */
+	const fmt = (x: number) =>
+		format.number(Math.round(x * 10) / 10, {
+			minimumFractionDigits: 1,
+			maximumFractionDigits: 1,
+		});
 	/** Raw error of the last AI proposal / formation fetch, translated at render. */
 	const [aiError, setAiError] = useState<{ cause: unknown } | null>(null);
-	const [clientError, setClientError] = useState<string | null>(null);
+	/** Client-side check failed: too few starters (translated at render). */
+	const [clientError, setClientError] = useState(false);
 	const requestId = useRef(0);
 
 	const utils = api.useUtils();
@@ -181,7 +177,7 @@ export function LineupEditor({
 
 	const touch = () => {
 		if (save.isSuccess || save.isError) save.reset();
-		setClientError(null);
+		setClientError(false);
 	};
 
 	/** Put `playerId` into the target spot; its previous occupant takes the player's old place. */
@@ -291,10 +287,10 @@ export function LineupEditor({
 	const submit = () => {
 		const filled = starters.filter((x): x is number => x !== null);
 		if (filled.length !== STARTERS_SIZE) {
-			setClientError("Skład musi mieć 11 zawodników");
+			setClientError(true);
 			return;
 		}
-		setClientError(null);
+		setClientError(false);
 		save.mutate({
 			gameId,
 			formation,
@@ -308,7 +304,7 @@ export function LineupEditor({
 		<div className="flex w-full max-w-4xl flex-col gap-6">
 			<section className="flex flex-wrap items-end gap-4 rounded-lg bg-white/10 p-4">
 				<label className="flex flex-col gap-1 text-sm text-green-200">
-					Formacja
+					{tLineup("formation")}
 					<select
 						className="rounded bg-[#071a0e] px-2 py-1 text-white ring-1 ring-white/20"
 						disabled={busy}
@@ -326,7 +322,7 @@ export function LineupEditor({
 					</select>
 				</label>
 				<label className="flex flex-col gap-1 text-sm text-green-200">
-					Styl gry
+					{tLineup("style")}
 					<select
 						className="rounded bg-[#071a0e] px-2 py-1 text-white ring-1 ring-white/20"
 						disabled={busy}
@@ -339,9 +335,9 @@ export function LineupEditor({
 						}}
 						value={style}
 					>
-						{STYLES.map((s) => (
-							<option key={s.id} value={s.id}>
-								{s.label}
+						{STYLE_IDS.map((id) => (
+							<option key={id} value={id}>
+								{tl(`style.${id}`)}
 							</option>
 						))}
 					</select>
@@ -352,10 +348,10 @@ export function LineupEditor({
 					onClick={() => void aiProposal()}
 					type="button"
 				>
-					Propozycja AI
+					{tLineup("aiProposal")}
 				</button>
 				<div className="ml-auto text-right text-sm">
-					<div className="text-green-200">Atak / Obrona</div>
+					<div className="text-green-200">{tLineup("ratings")}</div>
 					<div className="text-xl font-bold tabular-nums">
 						{fmt(ratings.attack)} / {fmt(ratings.defense)}
 					</div>
@@ -376,11 +372,14 @@ export function LineupEditor({
 									key={i}
 								>
 									<div className="flex items-center justify-between text-[11px] text-green-200">
-										<span className="font-bold">{ROLE_LABEL[row.role]}</span>
+										<span className="font-bold">{tl(`role.${row.role}`)}</span>
 										<span className="tabular-nums">{p ? p.overall : "—"}</span>
 									</div>
 									<select
-										aria-label={`Slot ${ROLE_LABEL[row.role]} ${i}`}
+										aria-label={tLineup("slotAria", {
+											role: tl(`role.${row.role}`),
+											index: i,
+										})}
 										className={selectClass}
 										disabled={busy}
 										onChange={(e) => {
@@ -400,11 +399,11 @@ export function LineupEditor({
 			</section>
 
 			<section className="rounded-lg bg-white/10 p-4">
-				<h2 className="mb-2 text-lg font-bold">Ławka</h2>
+				<h2 className="mb-2 text-lg font-bold">{tLineup("bench")}</h2>
 				<div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
 					{bench.map((id, i) => (
 						<select
-							aria-label={`Ławka ${i + 1}`}
+							aria-label={tLineup("benchAria", { n: i + 1 })}
 							className={selectClass}
 							disabled={busy}
 							// biome-ignore lint/suspicious/noArrayIndexKey: fixed-size list of positional slots
@@ -430,10 +429,10 @@ export function LineupEditor({
 					onClick={submit}
 					type="button"
 				>
-					Zapisz
+					{tLineup("save")}
 				</button>
 				{save.isSuccess ? (
-					<span className="text-green-200">Zapisano</span>
+					<span className="text-green-200">{tLineup("saved")}</span>
 				) : null}
 				{save.error ? (
 					<span className="text-red-300">{errorText(t, save.error)}</span>
@@ -444,46 +443,47 @@ export function LineupEditor({
 					</span>
 				) : null}
 				{clientError ? (
-					<span className="text-red-300">{clientError}</span>
+					<span className="text-red-300">
+						{tLineup("mustHaveStarters", { n: STARTERS_SIZE })}
+					</span>
 				) : null}
 			</section>
 
 			<section>
-				<h2 className="mb-2 text-lg font-bold">Kadra</h2>
+				<h2 className="mb-2 text-lg font-bold">{tLineup("squad")}</h2>
 				<div className="overflow-x-auto">
 					<table className="w-full text-left text-sm">
 						<thead className="text-green-200">
 							<tr>
-								<th className="py-1 pr-2">Poz.</th>
-								<th className="py-1 pr-2">Zawodnik</th>
-								<th className="py-1 pr-2 text-right">Min</th>
-								<th className="py-1 pr-2 text-right">ATK</th>
-								<th className="py-1 pr-2 text-right">KRE</th>
-								<th className="py-1 pr-2 text-right">OBR</th>
-								<th className="py-1 pr-2 text-right">BRA</th>
-								<th className="py-1 pr-2 text-right">DYS</th>
-								<th className="py-1 pr-2 text-right">OGL</th>
-								<th className="py-1 pr-2 text-right">Kond.</th>
-								<th className="py-1">Status</th>
+								<th className="py-1 pr-2">{tLineup("col.position")}</th>
+								<th className="py-1 pr-2">{tLineup("col.player")}</th>
+								{NUMBER_COLUMNS.map((col) => (
+									<th className="py-1 pr-2 text-right" key={col}>
+										{tLineup(`col.${col}`)}
+									</th>
+								))}
+								<th className="py-1">{tLineup("col.status")}</th>
 							</tr>
 						</thead>
 						<tbody>
 							{squad.map((p) => {
 								const status = starterSet.has(p.playerId)
-									? "skład"
+									? "starter"
 									: benchSet.has(p.playerId)
-										? "ławka"
-										: "";
+										? "bench"
+										: null;
 								return (
 									<tr
 										className={`${
-											status === "skład"
+											status === "starter"
 												? "bg-white/20 font-semibold"
 												: "border-t border-white/10"
 										} ${p.status.available ? "" : "text-red-300/80"}`}
 										key={p.playerId}
 									>
-										<td className="py-1 pr-2">{POSITION_LABEL[p.position]}</td>
+										<td className="py-1 pr-2">
+											{tl(`position.${p.position}`)}
+										</td>
 										<td className="py-1 pr-2">{p.name}</td>
 										<td className="py-1 pr-2 text-right tabular-nums">
 											{p.minutes}
@@ -511,7 +511,9 @@ export function LineupEditor({
 										</td>
 										<td className="py-1">
 											{p.status.available ? (
-												status
+												status ? (
+													tLineup(`status.${status}`)
+												) : null
 											) : (
 												<span className="font-semibold text-red-300">
 													{absence(tLineup, p.status)}
