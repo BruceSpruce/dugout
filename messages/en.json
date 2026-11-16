@@ -1,0 +1,10 @@
+{
+	"meta": {
+		"description": "Premier League football manager"
+	},
+	"common": {
+		"language": "Language",
+		"switchToPl": "Switch to Polish",
+		"switchToEn": "Switch to English"
+	}
+}

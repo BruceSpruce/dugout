@@ -1,0 +1,10 @@
+{
+	"meta": {
+		"description": "Menedżer piłkarski Premier League"
+	},
+	"common": {
+		"language": "Język",
+		"switchToPl": "Przełącz na polski",
+		"switchToEn": "Przełącz na angielski"
+	}
+}
