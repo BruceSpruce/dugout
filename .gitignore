@@ -46,3 +46,10 @@ yarn-error.log*
 .idea
 # local data dumps (API-Football probe/import)
 /.data/
+
+# local-only: plans, PRD and change logs (not part of the public repo)
+/context/
+
+# Claude Code local files
+/.claude/settings.local.json
+/.claude/scheduled_tasks.lock
