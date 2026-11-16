@@ -19,15 +19,15 @@
 				"name": "D. Marlowe",
 				"firstname": "Daniel James",
 				"lastname": "Marlowe",
-				"age": 25,
+				"age": 26,
 				"birth": {
-					"date": "2000-03-25",
-					"place": "London",
+					"date": "1999-11-08",
+					"place": "Harrowgate",
 					"country": "England"
 				},
 				"nationality": "England",
-				"height": "180",
-				"weight": "76",
+				"height": "177",
+				"weight": "71",
 				"injured": false,
 				"photo": "https://example.invalid/players/7103.png"
 			},
@@ -47,8 +47,8 @@
 						"season": 2024
 					},
 					"games": {
-						"appearences": 31,
-						"lineups": 19,
+						"appearences": 32,
+						"lineups": 20,
 						"minutes": 1764,
 						"number": null,
 						"position": "Attacker",
@@ -56,45 +56,45 @@
 						"captain": false
 					},
 					"substitutes": {
-						"in": 12,
-						"out": 12,
-						"bench": 13
+						"in": 11,
+						"out": 11,
+						"bench": 14
 					},
 					"shots": {
-						"total": 12,
-						"on": 8
+						"total": 11,
+						"on": 7
 					},
 					"goals": {
-						"total": 3,
+						"total": 4,
 						"conceded": 0,
-						"assists": 4,
+						"assists": 3,
 						"saves": null
 					},
 					"passes": {
-						"total": 768,
-						"key": 38,
+						"total": 767,
+						"key": 37,
 						"accuracy": null
 					},
 					"tackles": {
-						"total": 13,
+						"total": 14,
 						"blocks": null,
-						"interceptions": 2
+						"interceptions": 1
 					},
 					"duels": {
-						"total": 160,
-						"won": 75
+						"total": 159,
+						"won": 76
 					},
 					"dribbles": {
-						"attempts": 86,
-						"success": 45,
+						"attempts": 85,
+						"success": 46,
 						"past": null
 					},
 					"fouls": {
-						"drawn": 11,
-						"committed": 6
+						"drawn": 12,
+						"committed": 5
 					},
 					"cards": {
-						"yellow": 2,
+						"yellow": 1,
 						"yellowred": 0,
 						"red": 0
 					},
@@ -114,15 +114,15 @@
 				"name": "R. Haddad",
 				"firstname": "Rami",
 				"lastname": "Haddad",
-				"age": 29,
+				"age": 28,
 				"birth": {
-					"date": "1996-01-01",
-					"place": "Qamar",
-					"country": "Syria"
+					"date": "1997-06-14",
+					"place": "Lindau",
+					"country": "Germany"
 				},
 				"nationality": "Germany",
-				"height": "178",
-				"weight": "68",
+				"height": "181",
+				"weight": "72",
 				"injured": false,
 				"photo": "https://example.invalid/players/7104.png"
 			},

@@ -11,12 +11,12 @@ The game is available in English and Polish (switch in the top-right corner).
 - Lineup and tactics: formation, style, AI-suggested lineup, injuries and suspensions.
 - Live matchday: minute-by-minute commentary, substitutions and tactic changes, other matches of the round simulated alongside.
 - Leave at any moment and resume later; an abandoned match is finished by the AI.
-- Season summary, history of all seasons and an all-time table; the next season starts after round 38.
+- Season summary, history of all seasons and an all-time table; the next season starts after the last round.
 - Match engine calibrated against real league statistics (goals per match, home wins, draws), with a batch calibration report.
 
 ## Requirements
 
-- Node.js 20+ and npm
+- Node.js 20.6+ and npm
 - Docker (for the local PostgreSQL 18 database)
 - An [API-Football](https://www.api-football.com/) key (the free plan is enough; it allows 100 requests per day)
 
@@ -24,7 +24,7 @@ The game is available in English and Polish (switch in the top-right corner).
 
 ```bash
 cp .env.example .env              # set API_FOOTBALL_KEY; DATABASE_URL works with the script below
-./start-database.sh               # starts the dugout-postgres container
+./start-database.sh               # starts the dugout-postgres container (answer y to generate a password)
 npm install
 npm run db:migrate
 npm run import:season -- --league 39 --season 2024

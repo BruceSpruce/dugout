@@ -10,10 +10,15 @@ if [ -z "$npm" ]; then
 	exit 1
 fi
 path="$(dirname "$npm"):/usr/local/bin:/usr/bin:/bin"
+# Escape sed replacement metacharacters (\, & and the | delimiter) in the paths.
+esc() { printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'; }
 out="$HOME/.config/systemd/user"
 mkdir -p "$out"
-sed -e "s|@WORKDIR@|$repo|g" -e "s|@PATH@|$path|g" -e "s|@NPM@|$npm|g" \
-	"$dir/dugout-daily-fetch.service" >"$out/dugout-daily-fetch.service"
+tmp="$(mktemp "$out/.dugout-daily-fetch.service.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+sed -e "s|@WORKDIR@|$(esc "$repo")|g" -e "s|@PATH@|$(esc "$path")|g" -e "s|@NPM@|$(esc "$npm")|g" \
+	"$dir/dugout-daily-fetch.service" >"$tmp"
+mv "$tmp" "$out/dugout-daily-fetch.service"
 cp "$dir/dugout-daily-fetch.timer" "$out/"
 systemctl --user daemon-reload
 systemctl --user enable --now dugout-daily-fetch.timer

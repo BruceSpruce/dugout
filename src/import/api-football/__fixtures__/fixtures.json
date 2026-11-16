@@ -95,7 +95,7 @@
 				"venue": {
 					"id": 5602,
 					"name": "Southbay Arena",
-					"city": "Southbay Wanderers, Southbay Wanderersshire"
+					"city": "Southbay"
 				},
 				"status": {
 					"long": "Match Finished",
@@ -122,9 +122,9 @@
 					"winner": false
 				},
 				"away": {
-					"id": 903,
-					"name": "Southbay Wanderers",
-					"logo": "https://example.invalid/teams/903.png",
+					"id": 904,
+					"name": "Westfield Albion",
+					"logo": "https://example.invalid/teams/904.png",
 					"winner": true
 				}
 			},
