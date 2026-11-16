@@ -280,7 +280,9 @@ describe("reguly zmian (1.6)", () => {
 		const sixth = sub(20, starter(H, 7), benchAt(H, 5));
 		const v = validateChange(setup, 1, changes, sixth);
 		expect(v.ok).toBe(false);
-		if (!v.ok) expect(v.error).toContain("limit 5");
+		if (!v.ok) {
+			expect(v.error).toEqual({ code: "subsLimit", params: { max: 5 } });
+		}
 		expect(playLive(setup, 1, changes, 20).subsLeft.home).toBe(0);
 	});
 
@@ -294,10 +296,10 @@ describe("reguly zmian (1.6)", () => {
 			sub(40, starter(H, 10), out),
 		);
 		expect(back.ok).toBe(false);
-		if (!back.ok) expect(back.error).toContain("ławce");
+		if (!back.ok) expect(back.error).toEqual({ code: "subInNotOnBench" });
 		const gone = validateChange(setup, 1, [first], sub(40, out, benchAt(H, 1)));
 		expect(gone.ok).toBe(false);
-		if (!gone.ok) expect(gone.error).toContain("nie jest na boisku");
+		if (!gone.ok) expect(gone.error).toEqual({ code: "subOutNotOnPitch" });
 	});
 
 	it("zmiana tylko w biezacej minucie < 90 i nie przed poprzednia", () => {
@@ -308,7 +310,7 @@ describe("reguly zmian (1.6)", () => {
 			sub(90, starter(H, 9), benchAt(H, 0)),
 		);
 		expect(late.ok).toBe(false);
-		if (!late.ok) expect(late.error).toContain("zakończony");
+		if (!late.ok) expect(late.error).toEqual({ code: "matchOver" });
 		const first = sub(50, starter(H, 9), benchAt(H, 0));
 		expect(
 			validateChange(setup, 1, [first], sub(40, starter(H, 8), benchAt(H, 1)))
@@ -706,7 +708,7 @@ describe("przejecie meczu przez AI (exit-and-resume, faza 1)", () => {
 			} as const,
 		]) {
 			const v = validateChange(setup, 1, taken, change);
-			expect(v).toEqual({ ok: false, error: "Mecz prowadzi AI." });
+			expect(v).toEqual({ ok: false, error: { code: "aiInCharge" } });
 		}
 		// A stored user change after the takeover is ignored by the replay.
 		const ignored = playLive(

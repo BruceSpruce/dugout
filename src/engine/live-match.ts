@@ -121,6 +121,23 @@ export type LiveChange =
 			kind: "takeover";
 	  };
 
+/** Why a change of the user's side is rejected; the UI translates the code (errors.<code>). */
+export type LiveChangeErrorCode =
+	| "notCoaching"
+	| "matchOver"
+	| "aiInCharge"
+	| "unknownFormation"
+	| "subOutNotOnPitch"
+	| "subInNotOnBench"
+	| "subsLimit"
+	| "changeNotCurrentMinute";
+
+/** Plain, serialisable error data: a code plus ICU params (subsLimit: `max`). */
+export type LiveChangeError = {
+	code: LiveChangeErrorCode;
+	params?: Record<string, string | number>;
+};
+
 export type LiveEventKind =
 	| "goal"
 	| "yellow"
@@ -678,26 +695,27 @@ class Replay {
 	}
 
 	/** Checks a change of the user's side against the state at the end of its minute; null = valid. */
-	check(change: LiveChange, minute: number): string | null {
+	check(change: LiveChange, minute: number): LiveChangeError | null {
 		const side = this.setup.userSide;
-		if (side === null) return "W tym meczu nie prowadzisz drużyny.";
-		if (minute >= FULL_TIME) return "Mecz jest zakończony.";
+		if (side === null) return { code: "notCoaching" };
+		if (minute >= FULL_TIME) return { code: "matchOver" };
 		const s = this.sideOf(side);
-		if (s.ai) return "Mecz prowadzi AI.";
+		if (s.ai) return { code: "aiInCharge" };
 		if (change.kind === "takeover") return null;
 		if (change.kind === "tactic") {
-			if (!(change.formation in FORMATIONS)) return "Nieznana formacja.";
+			if (!(change.formation in FORMATIONS))
+				return { code: "unknownFormation" };
 			return null;
 		}
 		const onPitch = s.slots.some((x) => x.playerId === change.out);
 		if (!onPitch && !s.vacancies.includes(change.out)) {
-			return "Zawodnik schodzący nie jest na boisku.";
+			return { code: "subOutNotOnPitch" };
 		}
 		if (!s.bench.includes(change.in)) {
-			return "Zmiennik nie jest na ławce albo już zszedł z boiska.";
+			return { code: "subInNotOnBench" };
 		}
 		if (this.subsLeft(s) === 0) {
-			return `Wykorzystano limit ${this.model.maxSubs} zmian.`;
+			return { code: "subsLimit", params: { max: this.model.maxSubs } };
 		}
 		return null;
 	}
@@ -908,7 +926,7 @@ export function playLive(
 
 /**
  * Validates a change of the user's side at the current server minute (= change.minute, 0..89,
- * not before the last change). Errors in Polish for the UI.
+ * not before the last change). Errors are codes with params; the UI translates them.
  */
 export function validateChange(
 	setup: LiveSetup,
@@ -916,17 +934,17 @@ export function validateChange(
 	changes: LiveChange[],
 	change: LiveChange,
 	model: LiveModel = LIVE_MODEL,
-): { ok: true } | { ok: false; error: string } {
+): { ok: true } | { ok: false; error: LiveChangeError } {
 	if (
 		!Number.isInteger(change.minute) ||
 		change.minute < 0 ||
 		change.minute >= FULL_TIME
 	) {
-		return { ok: false, error: "Mecz jest zakończony." };
+		return { ok: false, error: { code: "matchOver" } };
 	}
 	const last = changes.reduce((m, c) => Math.max(m, c.minute), 0);
 	if (change.minute < last) {
-		return { ok: false, error: "Zmiana musi nastąpić w bieżącej minucie." };
+		return { ok: false, error: { code: "changeNotCurrentMinute" } };
 	}
 	const r = replay(setup, seed, changes, change.minute, model);
 	const error = r.check(change, change.minute);

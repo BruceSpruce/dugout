@@ -2,7 +2,12 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { FULL_TIME } from "~/engine/live-match";
-import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import {
+	appTRPCError,
+	createTRPCRouter,
+	publicProcedure,
+} from "~/server/api/trpc";
+import { type AppErrorData, appError, isAppError } from "~/server/app-error";
 import { FORMATION_IDS, STYLE_IDS } from "~/server/game/lineup";
 import {
 	claimFinish,
@@ -13,7 +18,6 @@ import {
 	loadViewContext,
 	lockLiveRow,
 	lockLiveRowAged,
-	ROUND_MOVED,
 	updateLiveProgress,
 	writeRoundFinish,
 } from "~/server/game/load-match";
@@ -24,13 +28,10 @@ import {
 	finishRound,
 	isAbandoned,
 	type LiveMatchRow,
-	MATCH_IN_PROGRESS,
 	matchView,
 	startRound,
 } from "~/server/game/match-flow";
 
-const GAME_NOT_FOUND = "Nie ma takiej gry";
-const NO_LIVE_MATCH = "Mecz nie trwa.";
 const MAX_INT = 2147483647;
 const id = z.number().int().positive().max(MAX_INT);
 const gameId = id;
@@ -44,15 +45,16 @@ const changeInput = z.discriminatedUnion("kind", [
 	}),
 ]);
 
-const bad = (message: string) =>
-	new TRPCError({ code: "BAD_REQUEST", message });
+const bad = (error: AppErrorData) => appTRPCError("BAD_REQUEST", error);
+const gameNotFound = () => appTRPCError("NOT_FOUND", appError("gameNotFound"));
+const noLiveMatch = () => bad(appError("matchNotLive"));
 
 type Ctx = { db: Parameters<typeof loadViewContext>[0] };
 
 async function viewOf(ctx: Ctx, row: LiveMatchRow) {
 	const context = await loadViewContext(ctx.db, row.gameId);
 	if (!context) {
-		throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+		throw gameNotFound();
 	}
 	return matchView(row, context.clubs, context.results);
 }
@@ -67,20 +69,18 @@ type Tx = Parameters<Parameters<Ctx["db"]["transaction"]>[0]>[0];
 async function finishInTx(tx: Tx, gameId: number) {
 	const row = await claimFinish(tx, gameId);
 	if (!row) {
-		throw bad(
-			"Nie ma meczu do zakończenia (mecz nie trwa albo nie doszedł do 90. minuty).",
-		);
+		throw bad(appError("noMatchToFinish"));
 	}
 	const totalRounds = await loadTotalRounds(tx, gameId);
 	if (!totalRounds) {
-		throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+		throw gameNotFound();
 	}
 	const finish = finishRound(row, totalRounds);
 	if (!finish.ok) throw bad(finish.error);
 	try {
 		await writeRoundFinish(tx, gameId, finish);
 	} catch (e) {
-		if (e instanceof Error && e.message === ROUND_MOVED) throw bad(ROUND_MOVED);
+		if (isAppError(e, "roundMoved")) throw bad(e.toData());
 		throw e;
 	}
 	return {
@@ -110,7 +110,7 @@ export const matchRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const data = await loadStartInput(ctx.db, input.gameId);
 			if (!data) {
-				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+				throw gameNotFound();
 			}
 			const started = startRound({
 				...data,
@@ -118,7 +118,7 @@ export const matchRouter = createTRPCRouter({
 			});
 			if (!started.ok) throw bad(started.error);
 			if (!(await insertLiveRow(ctx.db, started.row))) {
-				throw bad(MATCH_IN_PROGRESS);
+				throw bad(appError("matchInProgress"));
 			}
 			return viewOf(ctx, started.row);
 		}),
@@ -140,7 +140,7 @@ export const matchRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const row = await ctx.db.transaction(async (tx) => {
 				const locked = await lockLiveRow(tx, input.gameId);
-				if (!locked) throw bad(NO_LIVE_MATCH);
+				if (!locked) throw noLiveMatch();
 				const next = advanceMatch(locked, input.toMinute);
 				if (!next.ok) throw bad(next.error);
 				if (
@@ -163,7 +163,7 @@ export const matchRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const row = await ctx.db.transaction(async (tx) => {
 				const locked = await lockLiveRow(tx, input.gameId);
-				if (!locked) throw bad(NO_LIVE_MATCH);
+				if (!locked) throw noLiveMatch();
 				const next = applyChange(locked, input.change);
 				if (!next.ok) throw bad(next.error);
 				await updateLiveProgress(tx, input.gameId, { changes: next.changes });
@@ -193,7 +193,7 @@ export const matchRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			return ctx.db.transaction(async (tx) => {
 				const locked = await lockLiveRow(tx, input.gameId);
-				if (!locked) throw bad(NO_LIVE_MATCH);
+				if (!locked) throw noLiveMatch();
 				return exitInTx(tx, input.gameId, locked);
 			});
 		}),
@@ -217,7 +217,7 @@ export const matchRouter = createTRPCRouter({
 				});
 			} catch (e) {
 				// Called while rendering the game pages: never let a failed settle break them.
-				if (!(e instanceof TRPCError && e.message === ROUND_MOVED)) {
+				if (!(e instanceof TRPCError && isAppError(e.cause, "roundMoved"))) {
 					console.error("match.settle failed", input.gameId, e);
 				}
 				return { settled: false };

@@ -6,5 +6,51 @@
 		"language": "Język",
 		"switchToPl": "Przełącz na polski",
 		"switchToEn": "Przełącz na angielski"
+	},
+	"errors": {
+		"unknown": "Coś poszło nie tak.",
+		"startFailed": "Nie udało się rozpocząć meczu.",
+		"advanceFailed": "Nie udało się przesunąć meczu.",
+		"finishFailed": "Nie udało się zakończyć kolejki.",
+		"exitFailed": "Nie udało się wyjść z meczu.",
+		"changeFailed": "Nie udało się wprowadzić zmiany.",
+		"proposalFailed": "Nie udało się pobrać propozycji.",
+		"gameNotFound": "Nie ma takiej gry.",
+		"seasonNotLoaded": "Sezon nie jest załadowany — uruchom npm run import:season",
+		"seasonNotCompleted": "Ten sezon się jeszcze nie zakończył.",
+		"clubNotInSeason": "Ten klub nie gra w załadowanym sezonie.",
+		"gameCreateFailed": "Nie udało się utworzyć gry.",
+		"noMatchToFinish": "Nie ma meczu do zakończenia (mecz nie trwa albo nie doszedł do 90. minuty).",
+		"matchInProgress": "Mecz już trwa.",
+		"matchNotLive": "Mecz nie trwa.",
+		"matchStillRunning": "Mecz jeszcze trwa.",
+		"noOwnFixture": "Twój klub nie ma meczu w bieżącej kolejce.",
+		"savedLineupInvalid": "Zapisany skład: {reason}",
+		"roundMoved": "Kolejka została już zapisana (gra jest w innej kolejce).",
+		"unknownFormation": "Nieznana formacja.",
+		"unknownStyle": "Nieznany styl gry.",
+		"lineupSize": "W składzie musi być dokładnie {n} zawodników.",
+		"starterDuplicate": "Ten sam zawodnik występuje w składzie więcej niż raz.",
+		"starterNotInSquad": "W składzie jest zawodnik spoza kadry klubu.",
+		"benchSize": "Na ławce może być najwyżej {max} zawodników.",
+		"benchDuplicate": "Ten sam zawodnik występuje na ławce więcej niż raz.",
+		"benchNotInSquad": "Na ławce jest zawodnik spoza kadry klubu.",
+		"starterOnBench": "Zawodnik nie może być jednocześnie w składzie i na ławce.",
+		"playerUnavailable": "Niedostępny zawodnik {where, select, starters {w składzie} other {na ławce}}: {name} — {reason}",
+		"unavailableInjury": "kontuzja, jeszcze {n, plural, one {# mecz} few {# mecze} many {# meczów} other {# meczu}}",
+		"unavailableSuspension": "pauza za kartki, jeszcze {n, plural, one {# mecz} few {# mecze} many {# meczów} other {# meczu}}",
+		"notCoaching": "W tym meczu nie prowadzisz drużyny.",
+		"matchOver": "Mecz jest zakończony.",
+		"aiInCharge": "Mecz prowadzi AI.",
+		"subOutNotOnPitch": "Zawodnik schodzący nie jest na boisku.",
+		"subInNotOnBench": "Zmiennik nie jest na ławce albo już zszedł z boiska.",
+		"subsLimit": "Wykorzystano limit {max} zmian.",
+		"changeNotCurrentMinute": "Zmiana musi nastąpić w bieżącej minucie."
+	},
+	"lineup": {
+		"absence": {
+			"injury": "kontuzja {n, plural, one {# mecz} few {# mecze} many {# meczów} other {# meczu}}",
+			"suspension": "pauza {n, plural, one {# mecz} few {# mecze} many {# meczów} other {# meczu}}"
+		}
 	}
 }

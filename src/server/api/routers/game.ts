@@ -1,9 +1,13 @@
-import { TRPCError } from "@trpc/server";
 import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { bestElevenFor, teamRatings } from "~/engine/tactics";
-import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import {
+	appTRPCError,
+	createTRPCRouter,
+	publicProcedure,
+} from "~/server/api/trpc";
+import { appError } from "~/server/app-error";
 import { club, game, gameLineup } from "~/server/db/schema";
 import {
 	aiProposal,
@@ -32,8 +36,7 @@ import {
 	seasonSummary,
 } from "~/server/game/season-summary";
 
-const GAME_NOT_FOUND = "Nie ma takiej gry";
-const SEASON_NOT_COMPLETED = "Ten sezon się jeszcze nie zakończył";
+const gameNotFound = () => appTRPCError("NOT_FOUND", appError("gameNotFound"));
 const MAX_INT = 2147483647;
 const id = z.number().int().positive().max(MAX_INT);
 const gameId = id;
@@ -41,14 +44,14 @@ const formationInput = z.enum(FORMATION_IDS);
 const styleInput = z.enum(STYLE_IDS);
 const bench = z.array(id).max(9);
 
-const SEASON_NOT_LOADED =
-	"Sezon nie jest załadowany — uruchom npm run import:season";
+const seasonNotLoaded = () =>
+	appTRPCError("NOT_FOUND", appError("seasonNotLoaded"));
 
 export const gameRouter = createTRPCRouter({
 	clubs: publicProcedure.query(async ({ ctx }) => {
 		const seasonId = await latestSeasonId(ctx.db);
 		if (seasonId === null) {
-			throw new TRPCError({ code: "NOT_FOUND", message: SEASON_NOT_LOADED });
+			throw seasonNotLoaded();
 		}
 		return loadSeasonClubs(ctx.db, seasonId);
 	}),
@@ -58,24 +61,21 @@ export const gameRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const seasonId = await latestSeasonId(ctx.db);
 			if (seasonId === null) {
-				throw new TRPCError({ code: "NOT_FOUND", message: SEASON_NOT_LOADED });
+				throw seasonNotLoaded();
 			}
 			const clubs = await loadSeasonClubs(ctx.db, seasonId);
 			if (!clubs.some((c) => c.clubId === input.clubId)) {
-				throw new TRPCError({
-					code: "BAD_REQUEST",
-					message: "Ten klub nie gra w załadowanym sezonie",
-				});
+				throw appTRPCError("BAD_REQUEST", appError("clubNotInSeason"));
 			}
 			const [created] = await ctx.db
 				.insert(game)
 				.values({ competitionSeasonId: seasonId, clubId: input.clubId })
 				.returning({ id: game.id });
 			if (!created) {
-				throw new TRPCError({
-					code: "INTERNAL_SERVER_ERROR",
-					message: "Nie udało się utworzyć gry",
-				});
+				throw appTRPCError(
+					"INTERNAL_SERVER_ERROR",
+					appError("gameCreateFailed"),
+				);
 			}
 			return { gameId: created.id };
 		}),
@@ -100,10 +100,7 @@ export const gameRouter = createTRPCRouter({
 		.query(async ({ ctx, input }) => {
 			const data = await loadRoundScreenInput(ctx.db, input.gameId);
 			if (!data) {
-				throw new TRPCError({
-					code: "NOT_FOUND",
-					message: "Nie ma takiej gry",
-				});
+				throw gameNotFound();
 			}
 			return buildRoundScreen(data);
 		}),
@@ -113,14 +110,11 @@ export const gameRouter = createTRPCRouter({
 		.query(async ({ ctx, input }) => {
 			const g = await loadSeasonGame(ctx.db, input.gameId);
 			if (!g) {
-				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+				throw gameNotFound();
 			}
 			// Only completed seasons: the current one is still running, later ones do not exist.
 			if (input.seasonNo >= g.seasonNo) {
-				throw new TRPCError({
-					code: "NOT_FOUND",
-					message: SEASON_NOT_COMPLETED,
-				});
+				throw appTRPCError("NOT_FOUND", appError("seasonNotCompleted"));
 			}
 			const results = await loadSeasonResults(
 				ctx.db,
@@ -141,7 +135,7 @@ export const gameRouter = createTRPCRouter({
 		.query(async ({ ctx, input }) => {
 			const g = await loadSeasonGame(ctx.db, input.gameId);
 			if (!g) {
-				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+				throw gameNotFound();
 			}
 			const rows = await loadCompletedResults(ctx.db, input.gameId, g.seasonNo);
 			const history = gameHistory({
@@ -157,7 +151,7 @@ export const gameRouter = createTRPCRouter({
 		.query(async ({ ctx, input }) => {
 			const data = await loadClubSquad(ctx.db, input.gameId);
 			if (!data) {
-				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+				throw gameNotFound();
 			}
 			const [saved] = await ctx.db
 				.select({
@@ -187,7 +181,7 @@ export const gameRouter = createTRPCRouter({
 		.query(async ({ ctx, input }) => {
 			const data = await loadClubSquad(ctx.db, input.gameId);
 			if (!data) {
-				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+				throw gameNotFound();
 			}
 			return aiProposal(
 				squadForRound(data.squad, data.states).available,
@@ -207,7 +201,7 @@ export const gameRouter = createTRPCRouter({
 		.query(async ({ ctx, input }) => {
 			const data = await loadClubSquad(ctx.db, input.gameId);
 			if (!data) {
-				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+				throw gameNotFound();
 			}
 			const effective = squadForRound(data.squad, data.states).effective;
 			const byId = new Map(effective.map((p) => [p.playerId, p]));
@@ -236,18 +230,18 @@ export const gameRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			const data = await loadClubSquad(ctx.db, input.gameId);
 			if (!data) {
-				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+				throw gameNotFound();
 			}
 			const checked = validateLineup(
 				input,
 				new Set(data.squad.map((p) => p.playerId)),
 			);
 			if (!checked.ok) {
-				throw new TRPCError({ code: "BAD_REQUEST", message: checked.error });
+				throw appTRPCError("BAD_REQUEST", checked.error);
 			}
 			const available = validateAvailability(input, data.squad, data.states);
 			if (!available.ok) {
-				throw new TRPCError({ code: "BAD_REQUEST", message: available.error });
+				throw appTRPCError("BAD_REQUEST", available.error);
 			}
 			const values = {
 				formation: input.formation,

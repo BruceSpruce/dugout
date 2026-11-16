@@ -4,7 +4,6 @@ import type { PlayerAttributes, Position } from "~/engine/attributes";
 import { freshState } from "~/engine/player-state";
 import {
 	aiProposal,
-	matchesWord,
 	sortSquad,
 	squadForRound,
 	unavailableReason,
@@ -58,58 +57,61 @@ describe("validateLineup", () => {
 			{ ...good, starters: good.starters.slice(0, 10) },
 			ids,
 		);
-		expect(error(r)).toMatch(/11/);
+		expect(error(r)).toEqual({ code: "lineupSize", params: { n: 11 } });
 	});
 
 	it("rejects a duplicate starter", () => {
 		const starters = [...good.starters.slice(0, 10), 1];
-		expect(error(validateLineup({ ...good, starters }, ids))).toMatch(
-			/więcej niż raz/,
-		);
+		expect(error(validateLineup({ ...good, starters }, ids))).toEqual({
+			code: "starterDuplicate",
+		});
 	});
 
 	it("rejects a starter outside the squad", () => {
 		const starters = [...good.starters.slice(0, 10), 999];
-		expect(error(validateLineup({ ...good, starters }, ids))).toMatch(
-			/spoza kadry/,
-		);
+		expect(error(validateLineup({ ...good, starters }, ids))).toEqual({
+			code: "starterNotInSquad",
+		});
 	});
 
 	it("rejects a bench over 9", () => {
 		const bench = [...good.bench, 16];
-		expect(error(validateLineup({ ...good, bench }, ids))).toMatch(/9/);
+		expect(error(validateLineup({ ...good, bench }, ids))).toEqual({
+			code: "benchSize",
+			params: { max: 9 },
+		});
 	});
 
 	it("rejects a starter on the bench", () => {
 		const bench = [...good.bench.slice(0, 8), 1];
-		expect(error(validateLineup({ ...good, bench }, ids))).toMatch(
-			/jednocześnie/,
-		);
+		expect(error(validateLineup({ ...good, bench }, ids))).toEqual({
+			code: "starterOnBench",
+		});
 	});
 
 	it("rejects bench duplicates and outsiders", () => {
-		expect(error(validateLineup({ ...good, bench: [2, 2] }, ids))).toMatch(
-			/ławce/,
-		);
-		expect(error(validateLineup({ ...good, bench: [999] }, ids))).toMatch(
-			/spoza kadry/,
-		);
+		expect(error(validateLineup({ ...good, bench: [2, 2] }, ids))).toEqual({
+			code: "benchDuplicate",
+		});
+		expect(error(validateLineup({ ...good, bench: [999] }, ids))).toEqual({
+			code: "benchNotInSquad",
+		});
 	});
 
 	it("rejects an unknown formation and style", () => {
-		expect(error(validateLineup({ ...good, formation: "9-1-1" }, ids))).toMatch(
-			/formacja/,
+		expect(error(validateLineup({ ...good, formation: "9-1-1" }, ids))).toEqual(
+			{ code: "unknownFormation" },
 		);
-		expect(error(validateLineup({ ...good, style: "crazy" }, ids))).toMatch(
-			/styl/,
-		);
+		expect(error(validateLineup({ ...good, style: "crazy" }, ids))).toEqual({
+			code: "unknownStyle",
+		});
 	});
 
 	it("does not treat Object.prototype keys as formations", () => {
 		for (const formation of ["toString", "constructor", "__proto__"]) {
-			expect(error(validateLineup({ ...good, formation }, ids))).toMatch(
-				/formacja/,
-			);
+			expect(error(validateLineup({ ...good, formation }, ids))).toEqual({
+				code: "unknownFormation",
+			});
 		}
 	});
 });
@@ -172,19 +174,14 @@ describe("squadForRound", () => {
 		expect(aiProposal(r.available, "4-4-2").starters).not.toContain(17);
 	});
 
-	it("komunikat niedostepnosci z odmiana", () => {
-		expect([1, 2, 4, 5, 12, 22, 25].map(matchesWord)).toEqual([
-			"mecz",
-			"mecze",
-			"mecze",
-			"meczów",
-			"meczów",
-			"mecze",
-			"meczów",
-		]);
-		expect(unavailableReason("Kowalski", undefined)).toBeNull();
+	it("powod niedostepnosci: rodzaj i liczba meczow (odmiana w src/i18n/error-text.test.ts)", () => {
+		expect(unavailableReason(undefined)).toBeNull();
+		expect(unavailableReason({ ...freshState(), injuredFor: 1 })).toEqual({
+			kind: "injury",
+			matches: 1,
+		});
 		expect(
-			unavailableReason("Kowalski", { ...freshState(), injuredFor: 1 }),
-		).toBe("Kowalski — kontuzja, jeszcze 1 mecz");
+			unavailableReason({ ...freshState(), suspendedFor: 2, injuredFor: 0 }),
+		).toEqual({ kind: "suspension", matches: 2 });
 	});
 });

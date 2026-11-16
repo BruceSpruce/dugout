@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { PlayerAttributes, Position } from "~/engine/attributes";
 import { playLive } from "~/engine/live-match";
 import { freshState, type PlayerState } from "~/engine/player-state";
+import type { AppErrorData } from "~/server/app-error";
 import { aiProposal, validateAvailability } from "./lineup";
 import {
 	ABANDON_AFTER_MINUTES,
@@ -104,13 +105,13 @@ const baseInput = (
 
 const started = (input: StartInput): LiveMatchRow => {
 	const r = startRound(input);
-	if (!r.ok) throw new Error(r.error);
+	if (!r.ok) throw new Error(r.error.code);
 	return r.row;
 };
 
 const atMinute = (row: LiveMatchRow, minute: number): LiveMatchRow => {
 	const a = advanceMatch(row, minute);
-	if (!a.ok) throw new Error(a.error);
+	if (!a.ok) throw new Error(a.error.code);
 	return { ...row, minute: a.minute, changes: a.changes };
 };
 
@@ -119,7 +120,7 @@ const injured = (matches: number): PlayerState => ({
 	injuredFor: matches,
 });
 
-const errorOf = (r: { ok: boolean; error?: string }) =>
+const errorOf = (r: { ok: boolean; error?: AppErrorData }) =>
 	r.ok ? null : (r.error ?? null);
 
 describe("startRound", () => {
@@ -151,9 +152,14 @@ describe("startRound", () => {
 		const r = startRound(
 			baseInput(w, { lineup, states: new Map([[star, injured(2)]]) }),
 		);
-		expect(errorOf(r)).toBe(
-			`Niedostępny zawodnik w składzie: P${star} — kontuzja, jeszcze 2 mecze`,
-		);
+		expect(errorOf(r)).toEqual({
+			code: "playerUnavailable",
+			params: {
+				where: "starters",
+				name: `P${star}`,
+				reason: { code: "unavailableInjury", params: { n: 2 } },
+			},
+		});
 	});
 
 	it("zapisany sklad z pauzujacym na lawce -> blad", () => {
@@ -166,7 +172,14 @@ describe("startRound", () => {
 				states: new Map([[sub, { ...freshState(), suspendedFor: 1 }]]),
 			}),
 		);
-		expect(errorOf(r)).toMatch(/na ławce: .* pauza za kartki, jeszcze 1 mecz$/);
+		expect(errorOf(r)).toEqual({
+			code: "playerUnavailable",
+			params: {
+				where: "bench",
+				name: `P${sub}`,
+				reason: { code: "unavailableSuspension", params: { n: 1 } },
+			},
+		});
 	});
 
 	it("zapisany sklad trafia do meczu w kolejnosci slotow", () => {
@@ -188,12 +201,12 @@ describe("startRound", () => {
 
 	it("mecz juz trwa / brak meczu w kolejce -> blad; wiersz finished mozna nadpisac", () => {
 		const w = world();
-		expect(errorOf(startRound(baseInput(w, { existing: "live" })))).toBe(
-			"Mecz już trwa.",
-		);
-		expect(errorOf(startRound(baseInput(w, { currentRound: 3 })))).toMatch(
-			/nie ma meczu/,
-		);
+		expect(errorOf(startRound(baseInput(w, { existing: "live" })))).toEqual({
+			code: "matchInProgress",
+		});
+		expect(errorOf(startRound(baseInput(w, { currentRound: 3 })))).toEqual({
+			code: "noOwnFixture",
+		});
 		expect(startRound(baseInput(w, { existing: "finished" })).ok).toBe(true);
 	});
 
@@ -218,9 +231,9 @@ describe("advanceMatch / applyChange", () => {
 		expect(back.ok && back.minute).toBe(30);
 		const over = advanceMatch(row, 500);
 		expect(over.ok && over.minute).toBe(90);
-		expect(errorOf(advanceMatch({ ...row, status: "finished" }, 40))).toBe(
-			"Mecz nie trwa.",
-		);
+		expect(errorOf(advanceMatch({ ...row, status: "finished" }, 40))).toEqual({
+			code: "matchNotLive",
+		});
 	});
 
 	it("zmiana gracza w biezacej minucie serwera, walidowana przez silnik", () => {
@@ -290,7 +303,7 @@ describe("exitMatch / isAbandoned / aiTakeover", () => {
 		const w = world();
 		const row = atMinute(started(baseInput(w)), 37);
 		const r = exitMatch(row);
-		if (!r.ok) throw new Error(r.error);
+		if (!r.ok) throw new Error(r.error.code);
 		expect(r.minute).toBe(90);
 		const takeovers = r.changes.filter((c) => c.kind === "takeover");
 		expect(takeovers).toEqual([{ minute: 37, by: "ai", kind: "takeover" }]);
@@ -310,13 +323,13 @@ describe("exitMatch / isAbandoned / aiTakeover", () => {
 		const w = world();
 		const row = atMinute(started(baseInput(w)), 90);
 		const r = exitMatch(row);
-		if (!r.ok) throw new Error(r.error);
+		if (!r.ok) throw new Error(r.error.code);
 		expect(r.minute).toBe(90);
 		expect(r.changes).toEqual(row.changes);
 		expect(aiTakeover(r.changes)).toBeNull();
-		expect(errorOf(exitMatch({ ...row, status: "finished" }))).toBe(
-			"Mecz nie trwa.",
-		);
+		expect(errorOf(exitMatch({ ...row, status: "finished" }))).toEqual({
+			code: "matchNotLive",
+		});
 	});
 
 	it("isAbandoned na granicy 30 minut", () => {
@@ -388,7 +401,9 @@ describe("finishRound", () => {
 	it("przed 90' -> blad", () => {
 		const w = world();
 		const row = atMinute(started(baseInput(w)), 89);
-		expect(errorOf(finishRound(row, TOTAL_ROUNDS))).toBe("Mecz jeszcze trwa.");
+		expect(errorOf(finishRound(row, TOTAL_ROUNDS))).toEqual({
+			code: "matchStillRunning",
+		});
 	});
 
 	it("zapisuje 10 wynikow kolejki i stan wszystkich zawodnikow kadr klubow, ktore graly", () => {
@@ -400,7 +415,7 @@ describe("finishRound", () => {
 			90,
 		);
 		const r = finishRound(row, TOTAL_ROUNDS);
-		if (!r.ok) throw new Error(r.error);
+		if (!r.ok) throw new Error(r.error.code);
 		expect(r.from).toEqual({ seasonNo: 1, round: 1 });
 		expect(r.next).toEqual({ seasonNo: 1, round: 2, seasonEnded: false });
 		expect(r.results).toHaveLength(10);
@@ -434,7 +449,7 @@ describe("finishRound", () => {
 	it("bez zmian kolejka 2 startuje ze stanem po kolejce 1", () => {
 		const w = world();
 		const r = finishRound(atMinute(started(baseInput(w)), 90), TOTAL_ROUNDS);
-		if (!r.ok) throw new Error(r.error);
+		if (!r.ok) throw new Error(r.error.code);
 		const states = new Map(r.states.map((s) => [s.playerId, s.state]));
 		const next = startRound(
 			baseInput(w, {
@@ -457,7 +472,7 @@ describe("finishRound", () => {
 		);
 		expect(row.seasonNo).toBe(3);
 		const r = finishRound(row, 2);
-		if (!r.ok) throw new Error(r.error);
+		if (!r.ok) throw new Error(r.error.code);
 		expect(r.from).toEqual({ seasonNo: 3, round: 2 });
 		expect(r.next).toEqual({ seasonNo: 4, round: 1, seasonEnded: true });
 		expect(r.results).toHaveLength(10);
@@ -500,8 +515,13 @@ describe("validateAvailability", () => {
 			ok: true,
 		});
 		const r = validateAvailability(lineup, squad, new Map([[id, injured(5)]]));
-		expect(errorOf(r)).toBe(
-			`Niedostępny zawodnik w składzie: P${id} — kontuzja, jeszcze 5 meczów`,
-		);
+		expect(errorOf(r)).toEqual({
+			code: "playerUnavailable",
+			params: {
+				where: "starters",
+				name: `P${id}`,
+				reason: { code: "unavailableInjury", params: { n: 5 } },
+			},
+		});
 	});
 });

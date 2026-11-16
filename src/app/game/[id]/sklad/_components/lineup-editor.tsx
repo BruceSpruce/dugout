@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useMemo, useRef, useState } from "react";
 
 import type { PlayerAttributes, Position } from "~/engine/attributes";
@@ -12,6 +13,7 @@ import {
 	type Style,
 	teamRatings,
 } from "~/engine/tactics";
+import { errorText } from "~/i18n/error-text";
 import { api } from "~/trpc/react";
 
 type PlayerStatus = {
@@ -92,26 +94,20 @@ function padBench(bench: number[]): (number | null)[] {
 	return Array.from({ length: BENCH_SIZE }, (_, i) => bench[i] ?? null);
 }
 
-const matchesWord = (n: number) =>
-	n === 1
-		? "mecz"
-		: n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)
-			? "mecze"
-			: "meczów";
+type LineupT = ReturnType<typeof useTranslations<"lineup">>;
 
 /** Short absence note ("kontuzja 2 mecze, pauza 1 mecz"); empty when available. */
-function absence(s: PlayerStatus): string {
+function absence(t: LineupT, s: PlayerStatus): string {
 	const parts: string[] = [];
-	if (s.injuredFor > 0) {
-		parts.push(`kontuzja ${s.injuredFor} ${matchesWord(s.injuredFor)}`);
-	}
+	if (s.injuredFor > 0) parts.push(t("absence.injury", { n: s.injuredFor }));
 	if (s.suspendedFor > 0) {
-		parts.push(`pauza ${s.suspendedFor} ${matchesWord(s.suspendedFor)}`);
+		parts.push(t("absence.suspension", { n: s.suspendedFor }));
 	}
 	return parts.join(", ");
 }
 
 function PlayerOptions({ squad, role }: { squad: SquadPlayer[]; role?: Role }) {
+	const t = useTranslations("lineup");
 	return GROUPS.map((g) => (
 		<optgroup key={g.position} label={g.label}>
 			{squad
@@ -124,7 +120,7 @@ function PlayerOptions({ squad, role }: { squad: SquadPlayer[]; role?: Role }) {
 					>
 						{p.name} · {p.overall}
 						{role && ROLE_POSITION[role] !== p.position ? " ×0,8" : ""}
-						{p.status.available ? "" : ` (${absence(p.status)})`}
+						{p.status.available ? "" : ` (${absence(t, p.status)})`}
 					</option>
 				))}
 		</optgroup>
@@ -159,7 +155,10 @@ export function LineupEditor({
 		padBench(initial.bench),
 	);
 	const [busy, setBusy] = useState(false);
-	const [aiError, setAiError] = useState<string | null>(null);
+	const t = useTranslations();
+	const tLineup = useTranslations("lineup");
+	/** Raw error of the last AI proposal / formation fetch, translated at render. */
+	const [aiError, setAiError] = useState<{ cause: unknown } | null>(null);
 	const [clientError, setClientError] = useState<string | null>(null);
 	const requestId = useRef(0);
 
@@ -228,9 +227,7 @@ export function LineupEditor({
 			await job(isLatest);
 		} catch (e) {
 			if (isLatest()) {
-				setAiError(
-					e instanceof Error ? e.message : "Nie udało się pobrać propozycji",
-				);
+				setAiError({ cause: e });
 			}
 		} finally {
 			if (isLatest()) setBusy(false);
@@ -439,9 +436,13 @@ export function LineupEditor({
 					<span className="text-green-200">Zapisano</span>
 				) : null}
 				{save.error ? (
-					<span className="text-red-300">{save.error.message}</span>
+					<span className="text-red-300">{errorText(t, save.error)}</span>
 				) : null}
-				{aiError ? <span className="text-red-300">{aiError}</span> : null}
+				{aiError ? (
+					<span className="text-red-300">
+						{errorText(t, aiError.cause, "proposalFailed")}
+					</span>
+				) : null}
 				{clientError ? (
 					<span className="text-red-300">{clientError}</span>
 				) : null}
@@ -513,7 +514,7 @@ export function LineupEditor({
 												status
 											) : (
 												<span className="font-semibold text-red-300">
-													{absence(p.status)}
+													{absence(tLineup, p.status)}
 												</span>
 											)}
 										</td>

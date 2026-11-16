@@ -1,7 +1,10 @@
 import { TRPCError } from "@trpc/server";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { NewGame } from "~/app/_components/new-game";
+import { errorText } from "~/i18n/error-text";
+import { AppError } from "~/server/app-error";
 import { api } from "~/trpc/server";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +15,9 @@ export default async function Home() {
 	try {
 		clubs = await api.game.clubs();
 	} catch (e) {
-		if (e instanceof TRPCError && e.code === "NOT_FOUND") {
-			notLoaded = e.message;
+		// createCaller skips errorFormatter: the code is on the AppError cause.
+		if (e instanceof TRPCError && e.cause instanceof AppError) {
+			notLoaded = errorText(await getTranslations(), e);
 		} else {
 			throw e;
 		}

@@ -4,6 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { computeAttributes, type PlayerAttributes } from "~/engine/attributes";
 import type { Db } from "~/import/api-football/load";
+import { AppError } from "~/server/app-error";
 import {
 	gameLineup,
 	gameLiveMatch,
@@ -178,9 +179,6 @@ export async function loadStartInput(
 		existing: (existing?.status as LiveStatus | undefined) ?? null,
 	};
 }
-
-export const ROUND_MOVED =
-	"Kolejka została już zapisana (gra jest w innej kolejce).";
 
 /**
  * Writes a new live row, overwriting only a finished one. False when a live match already
@@ -366,6 +364,6 @@ export async function writeRoundFinish(
 	);
 	if (advanced.length === 0) {
 		// Throwing rolls back the whole finish transaction.
-		throw new Error(ROUND_MOVED);
+		throw new AppError("roundMoved");
 	}
 }

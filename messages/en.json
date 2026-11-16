@@ -6,5 +6,51 @@
 		"language": "Language",
 		"switchToPl": "Switch to Polish",
 		"switchToEn": "Switch to English"
+	},
+	"errors": {
+		"unknown": "Something went wrong.",
+		"startFailed": "Could not start the match.",
+		"advanceFailed": "Could not advance the match.",
+		"finishFailed": "Could not finish the round.",
+		"exitFailed": "Could not leave the match.",
+		"changeFailed": "Could not make the change.",
+		"proposalFailed": "Could not load the proposal.",
+		"gameNotFound": "No such game.",
+		"seasonNotLoaded": "The season is not loaded — run npm run import:season",
+		"seasonNotCompleted": "This season has not finished yet.",
+		"clubNotInSeason": "This club does not play in the loaded season.",
+		"gameCreateFailed": "Could not create the game.",
+		"noMatchToFinish": "There is no match to finish (no match is live or it has not reached minute 90).",
+		"matchInProgress": "A match is already in progress.",
+		"matchNotLive": "No match is in progress.",
+		"matchStillRunning": "The match is still in progress.",
+		"noOwnFixture": "Your club has no match in the current round.",
+		"savedLineupInvalid": "Saved lineup: {reason}",
+		"roundMoved": "The round has already been saved (the game is in another round).",
+		"unknownFormation": "Unknown formation.",
+		"unknownStyle": "Unknown playing style.",
+		"lineupSize": "The lineup must have exactly {n} players.",
+		"starterDuplicate": "The same player appears in the lineup more than once.",
+		"starterNotInSquad": "A player in the lineup is not in the club's squad.",
+		"benchSize": "The bench can have at most {max} players.",
+		"benchDuplicate": "The same player appears on the bench more than once.",
+		"benchNotInSquad": "A player on the bench is not in the club's squad.",
+		"starterOnBench": "A player cannot be both in the lineup and on the bench.",
+		"playerUnavailable": "Unavailable player {where, select, starters {in the lineup} other {on the bench}}: {name} — {reason}",
+		"unavailableInjury": "injured, {n, plural, one {# more match} other {# more matches}}",
+		"unavailableSuspension": "suspended, {n, plural, one {# more match} other {# more matches}}",
+		"notCoaching": "You are not managing a team in this match.",
+		"matchOver": "The match is over.",
+		"aiInCharge": "The AI is managing the team.",
+		"subOutNotOnPitch": "The player coming off is not on the pitch.",
+		"subInNotOnBench": "The substitute is not on the bench or has already left the pitch.",
+		"subsLimit": "The limit of {max} substitutions has been used.",
+		"changeNotCurrentMinute": "A change must happen in the current minute."
+	},
+	"lineup": {
+		"absence": {
+			"injury": "injury {n, plural, one {# match} other {# matches}}",
+			"suspension": "ban {n, plural, one {# match} other {# matches}}"
+		}
 	}
 }

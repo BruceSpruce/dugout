@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FORMATIONS, type FormationId, type Style } from "~/engine/tactics";
+import { appErrorOf, type ErrorKey, errorText } from "~/i18n/error-text";
 import { api, type RouterOutputs } from "~/trpc/react";
 
 type MatchView = NonNullable<RouterOutputs["match"]["view"]>;
@@ -141,6 +143,7 @@ function Pitch({ side, title }: { side: ViewSide; title: string }) {
 
 export function MatchScreen({ gameId }: { gameId: number }) {
 	const router = useRouter();
+	const t = useTranslations();
 	const utils = api.useUtils();
 	const query = api.match.view.useQuery(
 		{ gameId },
@@ -157,7 +160,12 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 	const [playing, setPlaying] = useState(false);
 	const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
 	const [notice, setNotice] = useState<string | null>(null);
-	const [error, setError] = useState<string | null>(null);
+	/** The raw error (translated at render) and the text for an error without a code. */
+	const [error, setError] = useState<{
+		cause: unknown;
+		fallback: ErrorKey;
+	} | null>(null);
+	const errorMessage = error ? errorText(t, error.cause, error.fallback) : null;
 	const [confirmExit, setConfirmExit] = useState(false);
 	/** Potwierdź pressed: disables both buttons until exit fails (double click guard). */
 	const [exitStarted, setExitStarted] = useState(false);
@@ -230,9 +238,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 				if (next.minute >= FULL_TIME) setPlaying(false);
 			} catch (e) {
 				setPlaying(false);
-				setError(
-					e instanceof Error ? e.message : "Nie udało się przesunąć meczu",
-				);
+				setError({ cause: e, fallback: "advanceFailed" });
 			} finally {
 				inflight.current = false;
 				const pending = pendingTarget.current;
@@ -260,9 +266,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 		try {
 			publish(await start.mutateAsync({ gameId }));
 		} catch (e) {
-			setError(
-				e instanceof Error ? e.message : "Nie udało się rozpocząć meczu",
-			);
+			setError({ cause: e, fallback: "startFailed" });
 		}
 	};
 
@@ -274,9 +278,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 			router.push(`/game/${gameId}`);
 			router.refresh();
 		} catch (e) {
-			setError(
-				e instanceof Error ? e.message : "Nie udało się zakończyć kolejki",
-			);
+			setError({ cause: e, fallback: "finishFailed" });
 		}
 	};
 
@@ -298,7 +300,7 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 			exiting.current = false;
 			setExitStarted(false);
 			setConfirmExit(false);
-			setError(e instanceof Error ? e.message : "Nie udało się wyjść z meczu");
+			setError({ cause: e, fallback: "exitFailed" });
 		}
 	};
 
@@ -316,20 +318,19 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 				setNotice(null);
 			}
 		} catch (e) {
-			setError(
-				e instanceof Error ? e.message : "Nie udało się wprowadzić zmiany",
-			);
+			setError({ cause: e, fallback: "changeFailed" });
 		}
 	};
 
 	if (query.isLoading) return <p className="text-green-200">Ładowanie…</p>;
 	if (query.error) {
-		return <p className="text-red-300">{query.error.message}</p>;
+		return <p className="text-red-300">{errorText(t, query.error)}</p>;
 	}
 
 	if (!view) {
+		const errorCode = error ? appErrorOf(error.cause)?.code : undefined;
 		const skladHint =
-			error?.startsWith("Zapisany skład") || error?.startsWith("Niedostępny");
+			errorCode === "savedLineupInvalid" || errorCode === "playerUnavailable";
 		return (
 			<section className="flex w-full max-w-4xl flex-col items-start gap-3 rounded-lg bg-white/10 p-6">
 				<h1 className="text-2xl font-extrabold">Mecz</h1>
@@ -342,9 +343,9 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 				>
 					Rozpocznij mecz
 				</button>
-				{error ? (
+				{errorMessage ? (
 					<p className="text-red-300">
-						{error}
+						{errorMessage}
 						{skladHint ? (
 							<>
 								{" "}
@@ -474,8 +475,8 @@ export function MatchScreen({ gameId }: { gameId: number }) {
 				{notice ? (
 					<p className="mt-3 text-center text-yellow-300">{notice}</p>
 				) : null}
-				{error ? (
-					<p className="mt-3 text-center text-red-300">{error}</p>
+				{errorMessage ? (
+					<p className="mt-3 text-center text-red-300">{errorMessage}</p>
 				) : null}
 			</section>
 

@@ -6,10 +6,11 @@
  * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
  * need to use are documented accordingly near the end.
  */
-import { initTRPC } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
+import { AppError, type AppErrorData } from "~/server/app-error";
 import { db } from "~/server/db";
 
 /**
@@ -47,6 +48,8 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
 				...shape.data,
 				zodError:
 					error.cause instanceof ZodError ? error.cause.flatten() : null,
+				// Code + params for the UI to translate (src/i18n/error-text.ts).
+				appError: error.cause instanceof AppError ? error.cause.toData() : null,
 			},
 		};
 	},
@@ -58,6 +61,21 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
  * @see https://trpc.io/docs/server/server-side-calls
  */
 export const createCallerFactory = t.createCallerFactory;
+
+/**
+ * A TRPCError carrying a language-free AppError: message = code, cause = AppError, so the
+ * errorFormatter exposes `data.appError` and server callers can check `cause`.
+ */
+export function appTRPCError(
+	code: TRPCError["code"],
+	error: AppErrorData,
+): TRPCError {
+	return new TRPCError({
+		code,
+		message: error.code,
+		cause: AppError.from(error),
+	});
+}
 
 /**
  * 3. ROUTER & PROCEDURE (THE IMPORTANT BIT)

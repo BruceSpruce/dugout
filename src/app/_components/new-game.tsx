@@ -1,13 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
+import { errorText } from "~/i18n/error-text";
 import { api } from "~/trpc/react";
 
 type ClubItem = { clubId: number; name: string; logoUrl: string | null };
 
 export function NewGame({ clubs }: { clubs: ClubItem[] }) {
 	const router = useRouter();
+	const t = useTranslations();
 	const create = api.game.create.useMutation({
 		onSuccess: ({ gameId }) => router.push(`/game/${gameId}`),
 	});
@@ -34,7 +37,7 @@ export function NewGame({ clubs }: { clubs: ClubItem[] }) {
 				))}
 			</ul>
 			{create.error ? (
-				<p className="mt-4 text-red-300">{create.error.message}</p>
+				<p className="mt-4 text-red-300">{errorText(t, create.error)}</p>
 			) : null}
 		</section>
 	);

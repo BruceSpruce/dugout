@@ -18,6 +18,7 @@ import {
 	type Style,
 } from "~/engine/tactics";
 import type { Db } from "~/import/api-football/load";
+import { type AppErrorData, appError } from "~/server/app-error";
 import { loadAttributesInput } from "~/server/engine-input/attributes-input";
 
 export const FORMATION_IDS = Object.keys(FORMATIONS) as [
@@ -47,7 +48,9 @@ export type LineupProposal = {
 	bench: number[];
 };
 
-export type LineupValidation = { ok: true } | { ok: false; error: string };
+export type LineupValidation =
+	| { ok: true }
+	| { ok: false; error: AppErrorData };
 
 const hasDuplicates = (ids: number[]) => new Set(ids).size !== ids.length;
 
@@ -55,33 +58,36 @@ export function validateLineup(
 	input: LineupInput,
 	squadIds: Set<number>,
 ): LineupValidation {
-	const fail = (error: string): LineupValidation => ({ ok: false, error });
+	const fail = (error: AppErrorData): LineupValidation => ({
+		ok: false,
+		error,
+	});
 	if (!Object.hasOwn(FORMATIONS, input.formation))
-		return fail("Nieznana formacja");
+		return fail(appError("unknownFormation"));
 	if (!(STYLE_IDS as readonly string[]).includes(input.style)) {
-		return fail("Nieznany styl gry");
+		return fail(appError("unknownStyle"));
 	}
 	if (input.starters.length !== STARTERS) {
-		return fail("W składzie musi być dokładnie 11 zawodników");
+		return fail(appError("lineupSize", { n: STARTERS }));
 	}
 	if (hasDuplicates(input.starters)) {
-		return fail("Ten sam zawodnik występuje w składzie więcej niż raz");
+		return fail(appError("starterDuplicate"));
 	}
 	if (input.starters.some((id) => !squadIds.has(id))) {
-		return fail("W składzie jest zawodnik spoza kadry klubu");
+		return fail(appError("starterNotInSquad"));
 	}
 	if (input.bench.length > MAX_BENCH) {
-		return fail("Na ławce może być najwyżej 9 zawodników");
+		return fail(appError("benchSize", { max: MAX_BENCH }));
 	}
 	if (hasDuplicates(input.bench)) {
-		return fail("Ten sam zawodnik występuje na ławce więcej niż raz");
+		return fail(appError("benchDuplicate"));
 	}
 	if (input.bench.some((id) => !squadIds.has(id))) {
-		return fail("Na ławce jest zawodnik spoza kadry klubu");
+		return fail(appError("benchNotInSquad"));
 	}
 	const starters = new Set(input.starters);
 	if (input.bench.some((id) => starters.has(id))) {
-		return fail("Zawodnik nie może być jednocześnie w składzie i na ławce");
+		return fail(appError("starterOnBench"));
 	}
 	return { ok: true };
 }
@@ -179,26 +185,20 @@ export function squadForRound(
 	return { withStatus, available, effective };
 }
 
-/** "mecz" / "mecze" / "meczów" for n. */
-export function matchesWord(n: number): string {
-	if (n === 1) return "mecz";
-	const tens = n % 100;
-	const units = n % 10;
-	if (units >= 2 && units <= 4 && (tens < 12 || tens > 14)) return "mecze";
-	return "meczów";
-}
+/** Why a player misses the coming round: injury or suspension, matches still to miss. */
+export type UnavailableReason = {
+	kind: "injury" | "suspension";
+	matches: number;
+};
 
-/** Why a player cannot play the coming round ("X — kontuzja, jeszcze 2 mecze"), null when available. */
+/** Why a player cannot play the coming round (injury first), null when available. */
 export function unavailableReason(
-	name: string,
 	stored: PlayerState | undefined,
-): string | null {
+): UnavailableReason | null {
 	const s = stored ?? freshState();
-	if (s.injuredFor > 0) {
-		return `${name} — kontuzja, jeszcze ${s.injuredFor} ${matchesWord(s.injuredFor)}`;
-	}
+	if (s.injuredFor > 0) return { kind: "injury", matches: s.injuredFor };
 	if (s.suspendedFor > 0) {
-		return `${name} — pauza za kartki, jeszcze ${s.suspendedFor} ${matchesWord(s.suspendedFor)}`;
+		return { kind: "suspension", matches: s.suspendedFor };
 	}
 	return null;
 }
@@ -211,13 +211,21 @@ export function validateAvailability(
 ): LineupValidation {
 	const byId = new Map(squad.map((p) => [p.playerId, p]));
 	for (const id of [...lineup.starters, ...lineup.bench]) {
-		const reason = unavailableReason(
-			byId.get(id)?.name ?? `#${id}`,
-			states.get(id),
-		);
+		const reason = unavailableReason(states.get(id));
 		if (reason) {
-			const where = lineup.starters.includes(id) ? "w składzie" : "na ławce";
-			return { ok: false, error: `Niedostępny zawodnik ${where}: ${reason}` };
+			return {
+				ok: false,
+				error: appError("playerUnavailable", {
+					where: lineup.starters.includes(id) ? "starters" : "bench",
+					name: byId.get(id)?.name ?? `#${id}`,
+					reason: appError(
+						reason.kind === "injury"
+							? "unavailableInjury"
+							: "unavailableSuspension",
+						{ n: reason.matches },
+					),
+				}),
+			};
 		}
 	}
 	return { ok: true };

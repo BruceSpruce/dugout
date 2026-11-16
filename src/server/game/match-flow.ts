@@ -20,6 +20,7 @@ import { type OwnLineup, prepareRound } from "~/engine/live-round";
 import type { PlayerState, RedCard } from "~/engine/player-state";
 import { createRng } from "~/engine/rng";
 import type { FormationId, Role, Style, Tactic } from "~/engine/tactics";
+import { type AppErrorData, appError } from "~/server/app-error";
 import {
 	type LineupInput,
 	validateAvailability,
@@ -69,11 +70,16 @@ export type LiveMatchRow = {
 	status: LiveStatus;
 };
 
-export type FlowResult<T> = ({ ok: true } & T) | { ok: false; error: string };
+export type FlowResult<T> =
+	| ({ ok: true } & T)
+	| { ok: false; error: AppErrorData };
 
-const fail = (error: string): { ok: false; error: string } => ({
+const fail = (
+	code: AppErrorData["code"],
+	params?: AppErrorData["params"],
+): { ok: false; error: AppErrorData } => ({
 	ok: false,
-	error,
+	error: appError(code, params),
 });
 
 // --- start ------------------------------------------------------------------------------------
@@ -98,24 +104,22 @@ export type StartInput = {
 	seed: number;
 };
 
-export const MATCH_IN_PROGRESS = "Mecz już trwa.";
-
 /**
  * Prepares the round: the user's match setup (saved lineup or AI from available players, the
  * rival as AI), the background matches already played, and the state after the round of every
- * squad player of the clubs that play. Errors in Polish.
+ * squad player of the clubs that play. Errors are codes (AppErrorData).
  */
 export function startRound(
 	input: StartInput,
 ): FlowResult<{ row: LiveMatchRow }> {
-	if (input.existing === "live") return fail(MATCH_IN_PROGRESS);
+	if (input.existing === "live") return fail("matchInProgress");
 	const fixtures = input.fixtures
 		.filter((f) => f.round === input.currentRound)
 		.sort((a, b) => a.fixtureId - b.fixtureId);
 	const own = fixtures.find(
 		(f) => f.homeClubId === input.clubId || f.awayClubId === input.clubId,
 	);
-	if (!own) return fail("Twój klub nie ma meczu w bieżącej kolejce.");
+	if (!own) return fail("noOwnFixture");
 
 	const squad = input.squads.get(input.clubId) ?? [];
 	let ownLineup: OwnLineup | null = null;
@@ -124,7 +128,9 @@ export function startRound(
 			input.lineup,
 			new Set(squad.map((p) => p.playerId)),
 		);
-		if (!checked.ok) return fail(`Zapisany skład: ${checked.error}`);
+		if (!checked.ok) {
+			return fail("savedLineupInvalid", { reason: checked.error });
+		}
 		const available = validateAvailability(input.lineup, squad, input.states);
 		if (!available.ok) return available;
 		ownLineup = {
@@ -185,8 +191,6 @@ export function startRound(
 
 // --- advance / change -------------------------------------------------------------------------
 
-const NOT_LIVE = "Mecz nie trwa.";
-
 /**
  * Moves the match clock forward only (an earlier minute keeps the current one), max 90, and
  * appends explicit AI substitutions for the user's injured players left unreplaced (F5/F12).
@@ -195,7 +199,7 @@ export function advanceMatch(
 	row: Pick<LiveMatchRow, "setup" | "seed" | "changes" | "minute" | "status">,
 	toMinute: number,
 ): FlowResult<{ minute: number; changes: LiveChange[] }> {
-	if (row.status !== "live") return fail(NOT_LIVE);
+	if (row.status !== "live") return fail("matchNotLive");
 	const minute = Math.min(
 		FULL_TIME,
 		Math.max(row.minute, Math.floor(toMinute)),
@@ -213,7 +217,7 @@ export function applyChange(
 	row: Pick<LiveMatchRow, "setup" | "seed" | "changes" | "minute" | "status">,
 	change: PlayerChange,
 ): FlowResult<{ changes: LiveChange[] }> {
-	if (row.status !== "live") return fail(NOT_LIVE);
+	if (row.status !== "live") return fail("matchNotLive");
 	const full: LiveChange =
 		change.kind === "sub"
 			? {
@@ -251,7 +255,7 @@ export function aiTakeover(changes: LiveChange[]): number | null {
 export function exitMatch(
 	row: Pick<LiveMatchRow, "setup" | "seed" | "changes" | "minute" | "status">,
 ): FlowResult<{ minute: typeof FULL_TIME; changes: LiveChange[] }> {
-	if (row.status !== "live") return fail(NOT_LIVE);
+	if (row.status !== "live") return fail("matchNotLive");
 	const changes: LiveChange[] =
 		row.minute < FULL_TIME && aiTakeover(row.changes) === null
 			? [...row.changes, { minute: row.minute, by: "ai", kind: "takeover" }]
@@ -535,10 +539,10 @@ export function finishRound(
 	row: LiveMatchRow,
 	totalRounds: number,
 ): FlowResult<RoundFinish> {
-	if (row.minute < FULL_TIME) return fail("Mecz jeszcze trwa.");
+	if (row.minute < FULL_TIME) return fail("matchStillRunning");
 	const live = playLive(row.setup, row.seed, row.changes, FULL_TIME);
 	const outcome = live.outcome;
-	if (!outcome) return fail("Mecz jeszcze trwa.");
+	if (!outcome) return fail("matchStillRunning");
 
 	const states = new Map(
 		row.background.states.map((s) => [s.playerId, s.state]),
