@@ -1,0 +1,302 @@
+{
+	"get": "players",
+	"parameters": {
+		"league": "39",
+		"season": "2024",
+		"team": "901",
+		"page": "1"
+	},
+	"errors": [],
+	"results": 3,
+	"paging": {
+		"current": 1,
+		"total": 4
+	},
+	"response": [
+		{
+			"player": {
+				"id": 7101,
+				"name": "A. Lindqvist",
+				"firstname": "Anders",
+				"lastname": "Lindqvist",
+				"age": 33,
+				"birth": {
+					"date": "1991-05-12",
+					"place": "Norrby",
+					"country": "Denmark"
+				},
+				"nationality": "Denmark",
+				"height": "182",
+				"weight": "76",
+				"injured": false,
+				"photo": "https://example.invalid/players/7101.png"
+			},
+			"statistics": [
+				{
+					"team": {
+						"id": 901,
+						"name": "Northvale Rovers",
+						"logo": "https://example.invalid/teams/901.png"
+					},
+					"league": {
+						"id": 39,
+						"name": "Test League",
+						"country": "England",
+						"logo": "https://example.invalid/leagues/39.png",
+						"flag": "https://example.invalid/flags/test.svg",
+						"season": 2024
+					},
+					"games": {
+						"appearences": 35,
+						"lineups": 22,
+						"minutes": 1092,
+						"number": null,
+						"position": "Midfielder",
+						"rating": "6.936363",
+						"captain": false
+					},
+					"substitutes": {
+						"in": 13,
+						"out": null,
+						"bench": null
+					},
+					"shots": {
+						"total": 8,
+						"on": 2
+					},
+					"goals": {
+						"total": 1,
+						"conceded": 0,
+						"assists": 2,
+						"saves": null
+					},
+					"passes": {
+						"total": 657,
+						"key": 31,
+						"accuracy": null
+					},
+					"tackles": {
+						"total": 19,
+						"blocks": 5,
+						"interceptions": 7
+					},
+					"duels": {
+						"total": 63,
+						"won": 24
+					},
+					"dribbles": {
+						"attempts": 4,
+						"success": null,
+						"past": null
+					},
+					"fouls": {
+						"drawn": 3,
+						"committed": 8
+					},
+					"cards": {
+						"yellow": 4,
+						"yellowred": null,
+						"red": 0
+					},
+					"penalty": {
+						"won": null,
+						"commited": null,
+						"scored": 1,
+						"missed": 0,
+						"saved": null
+					}
+				}
+			]
+		},
+		{
+			"player": {
+				"id": 7102,
+				"name": "K. Brandt",
+				"firstname": "Karel",
+				"lastname": "Brandt",
+				"age": 29,
+				"birth": {
+					"date": "1995-03-30",
+					"place": "Veldhoven",
+					"country": "Netherlands"
+				},
+				"nationality": "Morocco",
+				"height": "183",
+				"weight": "82",
+				"injured": false,
+				"photo": "https://example.invalid/players/7102.png"
+			},
+			"statistics": [
+				{
+					"team": {
+						"id": 901,
+						"name": "Northvale Rovers",
+						"logo": "https://example.invalid/teams/901.png"
+					},
+					"league": {
+						"id": 39,
+						"name": "Test League",
+						"country": "England",
+						"logo": "https://example.invalid/leagues/39.png",
+						"flag": "https://example.invalid/flags/test.svg",
+						"season": 2024
+					},
+					"games": {
+						"appearences": null,
+						"lineups": null,
+						"minutes": null,
+						"number": null,
+						"position": "Midfielder",
+						"rating": null,
+						"captain": false
+					},
+					"substitutes": {
+						"in": null,
+						"out": null,
+						"bench": null
+					},
+					"shots": {
+						"total": null,
+						"on": null
+					},
+					"goals": {
+						"total": null,
+						"conceded": null,
+						"assists": null,
+						"saves": null
+					},
+					"passes": {
+						"total": null,
+						"key": null,
+						"accuracy": null
+					},
+					"tackles": {
+						"total": null,
+						"blocks": null,
+						"interceptions": null
+					},
+					"duels": {
+						"total": null,
+						"won": null
+					},
+					"dribbles": {
+						"attempts": null,
+						"success": null,
+						"past": null
+					},
+					"fouls": {
+						"drawn": null,
+						"committed": null
+					},
+					"cards": {
+						"yellow": null,
+						"yellowred": null,
+						"red": null
+					},
+					"penalty": {
+						"won": null,
+						"commited": null,
+						"scored": null,
+						"missed": null,
+						"saved": null
+					}
+				}
+			]
+		},
+		{
+			"player": {
+				"id": 7103,
+				"name": "D. Marlowe",
+				"firstname": "Daniel James",
+				"lastname": "Marlowe",
+				"age": 25,
+				"birth": {
+					"date": "2000-03-25",
+					"place": "London",
+					"country": "England"
+				},
+				"nationality": "England",
+				"height": "180",
+				"weight": "76",
+				"injured": false,
+				"photo": "https://example.invalid/players/7103.png"
+			},
+			"statistics": [
+				{
+					"team": {
+						"id": 901,
+						"name": "Northvale Rovers",
+						"logo": "https://example.invalid/teams/901.png"
+					},
+					"league": {
+						"id": 39,
+						"name": "Test League",
+						"country": "England",
+						"logo": "https://example.invalid/leagues/39.png",
+						"flag": "https://example.invalid/flags/test.svg",
+						"season": 2024
+					},
+					"games": {
+						"appearences": 0,
+						"lineups": 0,
+						"minutes": 0,
+						"number": null,
+						"position": "Attacker",
+						"rating": "6.964516",
+						"captain": false
+					},
+					"substitutes": {
+						"in": 0,
+						"out": 0,
+						"bench": 0
+					},
+					"shots": {
+						"total": 12,
+						"on": 8
+					},
+					"goals": {
+						"total": 0,
+						"conceded": 0,
+						"assists": 4,
+						"saves": null
+					},
+					"passes": {
+						"total": 768,
+						"key": 38,
+						"accuracy": null
+					},
+					"tackles": {
+						"total": 13,
+						"blocks": null,
+						"interceptions": 2
+					},
+					"duels": {
+						"total": 160,
+						"won": 75
+					},
+					"dribbles": {
+						"attempts": 86,
+						"success": 45,
+						"past": null
+					},
+					"fouls": {
+						"drawn": 11,
+						"committed": 6
+					},
+					"cards": {
+						"yellow": 0,
+						"yellowred": 0,
+						"red": 0
+					},
+					"penalty": {
+						"won": null,
+						"commited": null,
+						"scored": 0,
+						"missed": 0,
+						"saved": null
+					}
+				}
+			]
+		}
+	]
+}

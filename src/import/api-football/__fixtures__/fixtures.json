@@ -1,0 +1,155 @@
+{
+	"get": "fixtures",
+	"parameters": {
+		"league": "39",
+		"season": "2024"
+	},
+	"errors": [],
+	"results": 2,
+	"paging": {
+		"current": 1,
+		"total": 1
+	},
+	"response": [
+		{
+			"fixture": {
+				"id": 880001,
+				"referee": "T. Hollis",
+				"timezone": "UTC",
+				"date": "2024-08-16T19:00:00+00:00",
+				"timestamp": 1723834800,
+				"periods": {
+					"first": 1723834800,
+					"second": 1723838400
+				},
+				"venue": {
+					"id": 5601,
+					"name": "Northvale Park",
+					"city": "Northvale"
+				},
+				"status": {
+					"long": "Match Finished",
+					"short": "FT",
+					"elapsed": 90,
+					"extra": null
+				}
+			},
+			"league": {
+				"id": 39,
+				"name": "Test League",
+				"country": "England",
+				"logo": "https://example.invalid/leagues/39.png",
+				"flag": "https://example.invalid/flags/test.svg",
+				"season": 2024,
+				"round": "Regular Season - 1",
+				"standings": true
+			},
+			"teams": {
+				"home": {
+					"id": 901,
+					"name": "Northvale Rovers",
+					"logo": "https://example.invalid/teams/901.png",
+					"winner": true
+				},
+				"away": {
+					"id": 902,
+					"name": "Eastmoor Athletic",
+					"logo": "https://example.invalid/teams/902.png",
+					"winner": false
+				}
+			},
+			"goals": {
+				"home": 1,
+				"away": 0
+			},
+			"score": {
+				"halftime": {
+					"home": 0,
+					"away": 0
+				},
+				"fulltime": {
+					"home": 1,
+					"away": 0
+				},
+				"extratime": {
+					"home": null,
+					"away": null
+				},
+				"penalty": {
+					"home": null,
+					"away": null
+				}
+			}
+		},
+		{
+			"fixture": {
+				"id": 880002,
+				"referee": "P. Verne",
+				"timezone": "UTC",
+				"date": "2024-11-23T12:30:00+00:00",
+				"timestamp": 1732365000,
+				"periods": {
+					"first": 1732365000,
+					"second": 1732368600
+				},
+				"venue": {
+					"id": 5602,
+					"name": "Southbay Arena",
+					"city": "Southbay Wanderers, Southbay Wanderersshire"
+				},
+				"status": {
+					"long": "Match Finished",
+					"short": "FT",
+					"elapsed": 90,
+					"extra": 8
+				}
+			},
+			"league": {
+				"id": 39,
+				"name": "Test League",
+				"country": "England",
+				"logo": "https://example.invalid/leagues/39.png",
+				"flag": "https://example.invalid/flags/test.svg",
+				"season": 2024,
+				"round": "Regular Season - 12",
+				"standings": true
+			},
+			"teams": {
+				"home": {
+					"id": 903,
+					"name": "Southbay Wanderers",
+					"logo": "https://example.invalid/teams/903.png",
+					"winner": false
+				},
+				"away": {
+					"id": 903,
+					"name": "Southbay Wanderers",
+					"logo": "https://example.invalid/teams/903.png",
+					"winner": true
+				}
+			},
+			"goals": {
+				"home": 1,
+				"away": 2
+			},
+			"score": {
+				"halftime": {
+					"home": 0,
+					"away": 1
+				},
+				"fulltime": {
+					"home": 1,
+					"away": 2
+				},
+				"extratime": {
+					"home": null,
+					"away": null
+				},
+				"penalty": {
+					"home": null,
+					"away": null
+				}
+			}
+		}
+	]
+}

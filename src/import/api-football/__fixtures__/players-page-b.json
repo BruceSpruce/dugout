@@ -1,0 +1,543 @@
+{
+	"get": "players",
+	"parameters": {
+		"league": "39",
+		"season": "2024",
+		"team": "903",
+		"page": "1"
+	},
+	"errors": [],
+	"results": 6,
+	"paging": {
+		"current": 1,
+		"total": 1
+	},
+	"response": [
+		{
+			"player": {
+				"id": 7103,
+				"name": "D. Marlowe",
+				"firstname": "Daniel James",
+				"lastname": "Marlowe",
+				"age": 25,
+				"birth": {
+					"date": "2000-03-25",
+					"place": "London",
+					"country": "England"
+				},
+				"nationality": "England",
+				"height": "180",
+				"weight": "76",
+				"injured": false,
+				"photo": "https://example.invalid/players/7103.png"
+			},
+			"statistics": [
+				{
+					"team": {
+						"id": 903,
+						"name": "Southbay Wanderers",
+						"logo": "https://example.invalid/teams/903.png"
+					},
+					"league": {
+						"id": 39,
+						"name": "Test League",
+						"country": "England",
+						"logo": "https://example.invalid/leagues/39.png",
+						"flag": "https://example.invalid/flags/test.svg",
+						"season": 2024
+					},
+					"games": {
+						"appearences": 31,
+						"lineups": 19,
+						"minutes": 1764,
+						"number": null,
+						"position": "Attacker",
+						"rating": "6.964516",
+						"captain": false
+					},
+					"substitutes": {
+						"in": 12,
+						"out": 12,
+						"bench": 13
+					},
+					"shots": {
+						"total": 12,
+						"on": 8
+					},
+					"goals": {
+						"total": 3,
+						"conceded": 0,
+						"assists": 4,
+						"saves": null
+					},
+					"passes": {
+						"total": 768,
+						"key": 38,
+						"accuracy": null
+					},
+					"tackles": {
+						"total": 13,
+						"blocks": null,
+						"interceptions": 2
+					},
+					"duels": {
+						"total": 160,
+						"won": 75
+					},
+					"dribbles": {
+						"attempts": 86,
+						"success": 45,
+						"past": null
+					},
+					"fouls": {
+						"drawn": 11,
+						"committed": 6
+					},
+					"cards": {
+						"yellow": 2,
+						"yellowred": 0,
+						"red": 0
+					},
+					"penalty": {
+						"won": null,
+						"commited": null,
+						"scored": 0,
+						"missed": 0,
+						"saved": null
+					}
+				}
+			]
+		},
+		{
+			"player": {
+				"id": 7104,
+				"name": "R. Haddad",
+				"firstname": "Rami",
+				"lastname": "Haddad",
+				"age": 29,
+				"birth": {
+					"date": "1996-01-01",
+					"place": "Qamar",
+					"country": "Syria"
+				},
+				"nationality": "Germany",
+				"height": "178",
+				"weight": "68",
+				"injured": false,
+				"photo": "https://example.invalid/players/7104.png"
+			},
+			"statistics": [
+				{
+					"team": {
+						"id": 904,
+						"name": "Westfield Albion",
+						"logo": "https://example.invalid/teams/904.png"
+					},
+					"league": {
+						"id": 39,
+						"name": "Test League",
+						"country": "England",
+						"logo": "https://example.invalid/leagues/39.png",
+						"flag": "https://example.invalid/flags/test.svg",
+						"season": 2024
+					},
+					"games": {
+						"appearences": 0,
+						"lineups": 0,
+						"minutes": 0,
+						"number": null,
+						"position": "Midfielder",
+						"rating": null,
+						"captain": false
+					},
+					"substitutes": {
+						"in": 0,
+						"out": 0,
+						"bench": 0
+					},
+					"shots": {
+						"total": null,
+						"on": null
+					},
+					"goals": {
+						"total": 0,
+						"conceded": null,
+						"assists": null,
+						"saves": null
+					},
+					"passes": {
+						"total": null,
+						"key": null,
+						"accuracy": null
+					},
+					"tackles": {
+						"total": null,
+						"blocks": null,
+						"interceptions": null
+					},
+					"duels": {
+						"total": null,
+						"won": null
+					},
+					"dribbles": {
+						"attempts": null,
+						"success": null,
+						"past": null
+					},
+					"fouls": {
+						"drawn": null,
+						"committed": null
+					},
+					"cards": {
+						"yellow": 0,
+						"yellowred": 0,
+						"red": 0
+					},
+					"penalty": {
+						"won": null,
+						"commited": null,
+						"scored": null,
+						"missed": null,
+						"saved": null
+					}
+				}
+			]
+		},
+		{
+			"player": {
+				"id": 9001,
+				"name": "TieRating",
+				"firstname": "Tie",
+				"lastname": "TieRating",
+				"birth": {
+					"date": "1999-09-09"
+				},
+				"nationality": "Poland",
+				"height": "181 cm",
+				"weight": "75 kg"
+			},
+			"statistics": [
+				{
+					"team": {
+						"id": 901,
+						"name": "T901"
+					},
+					"league": {
+						"id": 39,
+						"name": "L39",
+						"season": 2024
+					},
+					"games": {
+						"appearences": 5,
+						"lineups": 3,
+						"minutes": 500,
+						"position": "Midfielder",
+						"rating": "7.100000"
+					},
+					"goals": {
+						"total": 1,
+						"conceded": null,
+						"assists": null,
+						"saves": null
+					},
+					"passes": {
+						"total": 10,
+						"key": null,
+						"accuracy": "15"
+					},
+					"cards": {
+						"yellow": null,
+						"yellowred": null,
+						"red": null
+					}
+				},
+				{
+					"team": {
+						"id": 902,
+						"name": "T902"
+					},
+					"league": {
+						"id": 39,
+						"name": "L39",
+						"season": 2024
+					},
+					"games": {
+						"appearences": 5,
+						"lineups": 3,
+						"minutes": 500,
+						"position": "Midfielder",
+						"rating": "6.500000"
+					},
+					"goals": {
+						"total": 1,
+						"conceded": null,
+						"assists": null,
+						"saves": null
+					},
+					"passes": {
+						"total": 10,
+						"key": null,
+						"accuracy": "15"
+					},
+					"cards": {
+						"yellow": null,
+						"yellowred": null,
+						"red": null
+					}
+				}
+			]
+		},
+		{
+			"player": {
+				"id": 9002,
+				"name": "TieLater",
+				"firstname": "Tie",
+				"lastname": "TieLater",
+				"birth": {
+					"date": "1999-09-09"
+				},
+				"nationality": "Poland",
+				"height": "181 cm",
+				"weight": "75 kg"
+			},
+			"statistics": [
+				{
+					"team": {
+						"id": 901,
+						"name": "T901"
+					},
+					"league": {
+						"id": 39,
+						"name": "L39",
+						"season": 2024
+					},
+					"games": {
+						"appearences": 5,
+						"lineups": 3,
+						"minutes": 500,
+						"position": "Midfielder",
+						"rating": "6.800000"
+					},
+					"goals": {
+						"total": 1,
+						"conceded": null,
+						"assists": null,
+						"saves": null
+					},
+					"passes": {
+						"total": 10,
+						"key": null,
+						"accuracy": "15"
+					},
+					"cards": {
+						"yellow": null,
+						"yellowred": null,
+						"red": null
+					}
+				},
+				{
+					"team": {
+						"id": 902,
+						"name": "T902"
+					},
+					"league": {
+						"id": 39,
+						"name": "L39",
+						"season": 2024
+					},
+					"games": {
+						"appearences": 5,
+						"lineups": 3,
+						"minutes": 500,
+						"position": "Defender",
+						"rating": "6.800000"
+					},
+					"goals": {
+						"total": 1,
+						"conceded": null,
+						"assists": null,
+						"saves": null
+					},
+					"passes": {
+						"total": 10,
+						"key": null,
+						"accuracy": "15"
+					},
+					"cards": {
+						"yellow": null,
+						"yellowred": null,
+						"red": null
+					}
+				}
+			]
+		},
+		{
+			"player": {
+				"id": 9003,
+				"name": "TieNull",
+				"firstname": "Tie",
+				"lastname": "TieNull",
+				"birth": {
+					"date": "1999-09-09"
+				},
+				"nationality": "Poland",
+				"height": "181 cm",
+				"weight": "75 kg"
+			},
+			"statistics": [
+				{
+					"team": {
+						"id": 901,
+						"name": "T901"
+					},
+					"league": {
+						"id": 39,
+						"name": "L39",
+						"season": 2024
+					},
+					"games": {
+						"appearences": 5,
+						"lineups": 3,
+						"minutes": 500,
+						"position": "Midfielder",
+						"rating": "6.000000"
+					},
+					"goals": {
+						"total": 1,
+						"conceded": null,
+						"assists": null,
+						"saves": null
+					},
+					"passes": {
+						"total": 10,
+						"key": null,
+						"accuracy": "15"
+					},
+					"cards": {
+						"yellow": null,
+						"yellowred": null,
+						"red": null
+					}
+				},
+				{
+					"team": {
+						"id": 902,
+						"name": "T902"
+					},
+					"league": {
+						"id": 39,
+						"name": "L39",
+						"season": 2024
+					},
+					"games": {
+						"appearences": 5,
+						"lineups": 3,
+						"minutes": 500,
+						"position": "Midfielder",
+						"rating": null
+					},
+					"goals": {
+						"total": 1,
+						"conceded": null,
+						"assists": null,
+						"saves": null
+					},
+					"passes": {
+						"total": 10,
+						"key": null,
+						"accuracy": "15"
+					},
+					"cards": {
+						"yellow": null,
+						"yellowred": null,
+						"red": null
+					}
+				}
+			]
+		},
+		{
+			"player": {
+				"id": 9004,
+				"name": "OtherLeague",
+				"firstname": "Tie",
+				"lastname": "OtherLeague",
+				"birth": {
+					"date": "1999-09-09"
+				},
+				"nationality": "Poland",
+				"height": "181 cm",
+				"weight": "75 kg"
+			},
+			"statistics": [
+				{
+					"team": {
+						"id": 901,
+						"name": "T901"
+					},
+					"league": {
+						"id": 2,
+						"name": "L2",
+						"season": 2024
+					},
+					"games": {
+						"appearences": 5,
+						"lineups": 3,
+						"minutes": 2000,
+						"position": "Midfielder",
+						"rating": "7.900000"
+					},
+					"goals": {
+						"total": 1,
+						"conceded": null,
+						"assists": null,
+						"saves": null
+					},
+					"passes": {
+						"total": 10,
+						"key": null,
+						"accuracy": "15"
+					},
+					"cards": {
+						"yellow": null,
+						"yellowred": null,
+						"red": null
+					}
+				},
+				{
+					"team": {
+						"id": 902,
+						"name": "T902"
+					},
+					"league": {
+						"id": 39,
+						"name": "L39",
+						"season": 2024
+					},
+					"games": {
+						"appearences": 5,
+						"lineups": 3,
+						"minutes": 100,
+						"position": "Midfielder",
+						"rating": "6.100000"
+					},
+					"goals": {
+						"total": 1,
+						"conceded": null,
+						"assists": null,
+						"saves": null
+					},
+					"passes": {
+						"total": 10,
+						"key": null,
+						"accuracy": "15"
+					},
+					"cards": {
+						"yellow": null,
+						"yellowred": null,
+						"red": null
+					}
+				}
+			]
+		}
+	]
+}

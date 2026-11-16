@@ -1,0 +1,37 @@
+{
+	"get": "teams",
+	"parameters": {
+		"league": "39",
+		"season": "2024"
+	},
+	"errors": [],
+	"results": 2,
+	"paging": {
+		"current": 1,
+		"total": 1
+	},
+	"response": [
+		{
+			"team": {
+				"id": 901,
+				"name": "Northvale Rovers",
+				"code": "NOR",
+				"country": "England",
+				"founded": 1881,
+				"national": false,
+				"logo": "https://example.invalid/teams/901.png"
+			}
+		},
+		{
+			"team": {
+				"id": 902,
+				"name": "Eastmoor Athletic",
+				"code": "EAS",
+				"country": "England",
+				"founded": 1895,
+				"national": false,
+				"logo": "https://example.invalid/teams/902.png"
+			}
+		}
+	]
+}
