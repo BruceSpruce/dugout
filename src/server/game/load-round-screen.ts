@@ -1,9 +1,9 @@
 // DB layer for the round screen and the club list: thin SQL, the logic lives in round-screen.ts.
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import type { Db } from "~/import/api-football/load";
-import { gameLiveMatch } from "~/server/db/schema";
+import { gameLiveMatch, gameResult } from "~/server/db/schema";
 import type { LiveStatus } from "./match-flow";
 import type { RoundScreenInput } from "./round-screen";
 
@@ -51,10 +51,11 @@ export async function loadRoundScreenInput(
 ): Promise<RoundScreenInput | null> {
 	const gameRows = await db.execute<{
 		club_id: number;
+		season_no: number;
 		current_round: number;
 		competition_season_id: number;
 	}>(
-		sql`select club_id, current_round, competition_season_id from dugout_game where id = ${gameId}`,
+		sql`select club_id, season_no, current_round, competition_season_id from dugout_game where id = ${gameId}`,
 	);
 	const g = gameRows[0];
 	if (!g) return null;
@@ -75,20 +76,39 @@ export async function loadRoundScreenInput(
 		home_goals: number;
 		away_goals: number;
 	}>(
-		sql`select fixture_id, home_goals, away_goals from dugout_game_result where game_id = ${gameId}`,
+		sql`select fixture_id, home_goals, away_goals from dugout_game_result
+			where game_id = ${gameId} and season_no = ${g.season_no}`,
 	);
 	const [live] = await db
 		.select({
 			status: gameLiveMatch.status,
+			seasonNo: gameLiveMatch.seasonNo,
 			round: gameLiveMatch.round,
 			fixtureId: gameLiveMatch.fixtureId,
 			changes: gameLiveMatch.changes,
 		})
 		.from(gameLiveMatch)
 		.where(eq(gameLiveMatch.gameId, gameId));
+	// The live row's result from its own season (it may be the last round of the previous one).
+	const [liveResult] = live
+		? await db
+				.select({
+					homeGoals: gameResult.homeGoals,
+					awayGoals: gameResult.awayGoals,
+				})
+				.from(gameResult)
+				.where(
+					and(
+						eq(gameResult.gameId, gameId),
+						eq(gameResult.seasonNo, live.seasonNo),
+						eq(gameResult.fixtureId, live.fixtureId),
+					),
+				)
+		: [];
 
 	return {
 		clubId: g.club_id,
+		seasonNo: g.season_no,
 		currentRound: g.current_round,
 		totalRounds: fixtureRows.reduce((m, f) => Math.max(m, f.round), 0),
 		clubs: clubs.map((c) => ({ clubId: c.clubId, name: c.name })),
@@ -107,9 +127,11 @@ export async function loadRoundScreenInput(
 		liveMatch: live
 			? {
 					status: live.status as LiveStatus,
+					seasonNo: live.seasonNo,
 					round: live.round,
 					fixtureId: live.fixtureId,
 					changes: live.changes,
+					result: liveResult ?? null,
 				}
 			: null,
 	};

@@ -29,6 +29,7 @@ export type DbOrTx = Db | Tx;
 
 type GameRow = {
 	clubId: number;
+	seasonNo: number;
 	currentRound: number;
 	competitionSeasonId: number;
 	leagueApiId: number;
@@ -38,12 +39,13 @@ type GameRow = {
 async function loadGame(db: Db, gameId: number): Promise<GameRow | null> {
 	const rows = await db.execute<{
 		club_id: number;
+		season_no: number;
 		current_round: number;
 		competition_season_id: number;
 		league_api_id: number;
 		season: number;
 	}>(
-		sql`select g.club_id, g.current_round, g.competition_season_id, cs.league_api_id, cs.season
+		sql`select g.club_id, g.season_no, g.current_round, g.competition_season_id, cs.league_api_id, cs.season
 			from dugout_game g join dugout_competition_season cs on cs.id = g.competition_season_id
 			where g.id = ${gameId}`,
 	);
@@ -51,6 +53,7 @@ async function loadGame(db: Db, gameId: number): Promise<GameRow | null> {
 	if (!g) return null;
 	return {
 		clubId: g.club_id,
+		seasonNo: g.season_no,
 		currentRound: g.current_round,
 		competitionSeasonId: g.competition_season_id,
 		leagueApiId: g.league_api_id,
@@ -61,6 +64,7 @@ async function loadGame(db: Db, gameId: number): Promise<GameRow | null> {
 const asRow = (r: typeof gameLiveMatch.$inferSelect): LiveMatchRow => ({
 	gameId: r.gameId,
 	fixtureId: r.fixtureId,
+	seasonNo: r.seasonNo,
 	round: r.round,
 	seed: r.seed,
 	setup: r.setup,
@@ -165,6 +169,7 @@ export async function loadStartInput(
 	return {
 		gameId,
 		clubId: g.clubId,
+		seasonNo: g.seasonNo,
 		currentRound: g.currentRound,
 		fixtures,
 		squads,
@@ -187,6 +192,7 @@ export async function insertLiveRow(
 ): Promise<boolean> {
 	const values = {
 		fixtureId: row.fixtureId,
+		seasonNo: row.seasonNo,
 		round: row.round,
 		seed: row.seed,
 		setup: row.setup,
@@ -201,11 +207,11 @@ export async function insertLiveRow(
 		.onConflictDoUpdate({
 			target: gameLiveMatch.gameId,
 			set: { ...values, updatedAt: sql`now()` },
-			// Only a finished row of an earlier round: a start that read a stale current_round
-			// (concurrent finish) must not replay the round that was just written.
+			// Only a finished row of an earlier (season_no, round): a start that read a stale
+			// position (concurrent finish) must not replay the round that was just written.
 			setWhere: and(
 				eq(gameLiveMatch.status, "finished"),
-				sql`${gameLiveMatch.round} < excluded.round`,
+				sql`(${gameLiveMatch.seasonNo}, ${gameLiveMatch.round}) < (excluded.season_no, excluded.round)`,
 			),
 		})
 		.returning({ gameId: gameLiveMatch.gameId });
@@ -225,7 +231,7 @@ export async function updateLiveProgress(
 		);
 }
 
-/** Clubs of the game's season and its results of earlier rounds (for the live table). */
+/** Clubs of the game's season and its results of earlier rounds of the current season (for the live table). */
 export async function loadViewContext(
 	db: Db,
 	gameId: number,
@@ -242,7 +248,7 @@ export async function loadViewContext(
 	}>(
 		sql`select r.fixture_id, f.home_club_id, f.away_club_id, r.home_goals, r.away_goals
 			from dugout_game_result r join dugout_fixture f on f.id = r.fixture_id
-			where r.game_id = ${gameId}`,
+			where r.game_id = ${gameId} and r.season_no = ${g.seasonNo}`,
 	);
 	return {
 		clubs: clubs.map((c) => ({ clubId: c.clubId, name: c.name })),
@@ -278,9 +284,26 @@ export async function claimFinish(
 	return r ? asRow(r) : null;
 }
 
+/** Last round of the fixtures of the game's season; null when the game does not exist. */
+export async function loadTotalRounds(
+	db: DbOrTx,
+	gameId: number,
+): Promise<number | null> {
+	const rows = await db.execute<{ total_rounds: number | null }>(
+		sql`select max(f.round) as total_rounds
+			from dugout_game g join dugout_fixture f on f.competition_season_id = g.competition_season_id
+			where g.id = ${gameId}`,
+	);
+	return rows[0]?.total_rounds ?? null;
+}
+
 const STATE_CHUNK = 1000;
 
-/** Writes the round: results (on conflict do nothing), player states (upsert), current_round = round + 1. */
+/**
+ * Writes the round: results of `finish.from.seasonNo` (on conflict do nothing), player states
+ * (upsert), at the end of a season fitness 100 and yellow cards 0 for every player state of the
+ * game, then moves the game to `finish.next` guarded by `finish.from`.
+ */
 export async function writeRoundFinish(
 	db: DbOrTx,
 	gameId: number,
@@ -289,9 +312,15 @@ export async function writeRoundFinish(
 	if (finish.results.length > 0) {
 		await db
 			.insert(gameResult)
-			.values(finish.results.map((r) => ({ gameId, ...r })))
+			.values(
+				finish.results.map((r) => ({
+					gameId,
+					seasonNo: finish.from.seasonNo,
+					...r,
+				})),
+			)
 			.onConflictDoNothing({
-				target: [gameResult.gameId, gameResult.fixtureId],
+				target: [gameResult.gameId, gameResult.seasonNo, gameResult.fixtureId],
 			});
 	}
 	for (let i = 0; i < finish.states.length; i += STATE_CHUNK) {
@@ -320,9 +349,19 @@ export async function writeRoundFinish(
 				},
 			});
 	}
+	if (finish.next.seasonEnded) {
+		// After the upsert above, so the last round's states do not overwrite the reset.
+		// Injuries, bans and form carry over to the next season.
+		await db.execute(
+			sql`update dugout_game_player_state set fitness = 100, yellow_count = 0
+				where game_id = ${gameId}`,
+		);
+	}
 	const advanced = await db.execute(
-		sql`update dugout_game set current_round = ${finish.nextRound}
-			where id = ${gameId} and current_round = ${finish.nextRound - 1}
+		sql`update dugout_game
+			set season_no = ${finish.next.seasonNo}, current_round = ${finish.next.round}
+			where id = ${gameId} and season_no = ${finish.from.seasonNo}
+				and current_round = ${finish.from.round}
 			returning id`,
 	);
 	if (advanced.length === 0) {

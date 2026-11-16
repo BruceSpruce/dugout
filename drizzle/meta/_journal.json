@@ -43,6 +43,13 @@
       "when": 1794759814970,
       "tag": "0005_windy_roulette",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794817612884,
+      "tag": "0006_absurd_thundra",
+      "breakpoints": true
     }
   ]
 }

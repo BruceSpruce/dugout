@@ -6,6 +6,8 @@ import { aiTakeover, type LiveStatus } from "./match-flow";
 
 export type RoundScreenInput = {
 	clubId: number;
+	/** Current season of the game; `results` are of this season only. */
+	seasonNo: number;
 	currentRound: number;
 	totalRounds: number;
 	clubs: { clubId: number; name: string }[];
@@ -20,9 +22,12 @@ export type RoundScreenInput = {
 	/** The game's game_live_match row (only what the screen needs); null when none. */
 	liveMatch: {
 		status: LiveStatus;
+		seasonNo: number;
 		round: number;
 		fixtureId: number;
 		changes: LiveChange[];
+		/** Game result of the row's fixture in the row's season; null when not written. */
+		result: { homeGoals: number; awayGoals: number } | null;
 	} | null;
 };
 
@@ -132,13 +137,24 @@ function aiFinishedOf(
 	nameOf: (clubId: number) => string,
 ): RoundScreen["aiFinished"] {
 	const live = input.liveMatch;
-	if (live?.status !== "finished" || live.round !== input.currentRound - 1) {
+	// The previous position: round 1 of a later season follows the last round of the one before.
+	const previous =
+		input.currentRound > 1
+			? { seasonNo: input.seasonNo, round: input.currentRound - 1 }
+			: { seasonNo: input.seasonNo - 1, round: input.totalRounds };
+	if (
+		live?.status !== "finished" ||
+		previous.seasonNo < 1 ||
+		live.seasonNo !== previous.seasonNo ||
+		live.round !== previous.round
+	) {
 		return null;
 	}
 	const fromMinute = aiTakeover(live.changes);
 	if (fromMinute === null) return null;
 	const f = input.fixtures.find((x) => x.fixtureId === live.fixtureId);
-	const r = input.results.find((x) => x.fixtureId === live.fixtureId);
+	// From the row's own season: `results` hold only the current season.
+	const r = live.result;
 	if (!f || !r) return null;
 	return {
 		home: nameOf(f.homeClubId),

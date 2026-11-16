@@ -58,6 +58,8 @@ export type LiveStatus = "live" | "finished";
 export type LiveMatchRow = {
 	gameId: number;
 	fixtureId: number;
+	/** Season of the game the row was started in. */
+	seasonNo: number;
 	round: number;
 	seed: number;
 	setup: LiveSetup;
@@ -79,6 +81,8 @@ const fail = (error: string): { ok: false; error: string } => ({
 export type StartInput = {
 	gameId: number;
 	clubId: number;
+	/** Current season of the game. */
+	seasonNo: number;
 	currentRound: number;
 	/** Fixtures of the season (or only of the current round). */
 	fixtures: FlowFixture[];
@@ -157,6 +161,7 @@ export function startRound(
 		row: {
 			gameId: input.gameId,
 			fixtureId: own.fixtureId,
+			seasonNo: input.seasonNo,
 			round: prepared.round,
 			seed: prepared.seed,
 			setup: prepared.setup,
@@ -485,6 +490,24 @@ export function matchView(
 
 // --- finish -----------------------------------------------------------------------------------
 
+/** A point of the game: round `round` of season `seasonNo`. */
+export type GamePosition = { seasonNo: number; round: number };
+
+export type NextPosition = GamePosition & {
+	/** The finished round was the last of its season; the next one opens a new season. */
+	seasonEnded: boolean;
+};
+
+/** Where the game goes after round `at`: the next round, or round 1 of the next season. */
+export function nextPosition(
+	at: GamePosition,
+	totalRounds: number,
+): NextPosition {
+	return at.round >= totalRounds
+		? { seasonNo: at.seasonNo + 1, round: 1, seasonEnded: true }
+		: { seasonNo: at.seasonNo, round: at.round + 1, seasonEnded: false };
+}
+
 export type RoundFinish = {
 	/** Every match of the round, the user's first. */
 	results: { fixtureId: number; homeGoals: number; awayGoals: number }[];
@@ -498,11 +521,20 @@ export type RoundFinish = {
 		red: RedCard;
 		injured: number;
 	}[];
-	nextRound: number;
+	/** The round that was played (the guard of the game update). */
+	from: GamePosition;
+	/** Where the game moves. */
+	next: NextPosition;
 };
 
-/** What the end of the round writes; only at minute 90. */
-export function finishRound(row: LiveMatchRow): FlowResult<RoundFinish> {
+/**
+ * What the end of the round writes; only at minute 90. `totalRounds` = last round of the
+ * season's fixtures: after it the game moves to round 1 of the next season.
+ */
+export function finishRound(
+	row: LiveMatchRow,
+	totalRounds: number,
+): FlowResult<RoundFinish> {
 	if (row.minute < FULL_TIME) return fail("Mecz jeszcze trwa.");
 	const live = playLive(row.setup, row.seed, row.changes, FULL_TIME);
 	const outcome = live.outcome;
@@ -535,6 +567,10 @@ export function finishRound(row: LiveMatchRow): FlowResult<RoundFinish> {
 			red: p.red,
 			injured: p.injured,
 		})),
-		nextRound: row.round + 1,
+		from: { seasonNo: row.seasonNo, round: row.round },
+		next: nextPosition(
+			{ seasonNo: row.seasonNo, round: row.round },
+			totalRounds,
+		),
 	};
 }

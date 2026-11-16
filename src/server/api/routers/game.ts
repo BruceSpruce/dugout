@@ -74,6 +74,7 @@ export const gameRouter = createTRPCRouter({
 			.select({
 				gameId: game.id,
 				clubName: club.name,
+				seasonNo: game.seasonNo,
 				currentRound: game.currentRound,
 				createdAt: game.createdAt,
 			})

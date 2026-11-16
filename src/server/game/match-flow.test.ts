@@ -15,6 +15,7 @@ import {
 	isAbandoned,
 	type LiveMatchRow,
 	matchView,
+	nextPosition,
 	type StartInput,
 	startRound,
 } from "./match-flow";
@@ -55,6 +56,8 @@ const squadOf = (clubId: number, base: number) => {
 };
 
 const OWN = 1;
+/** Rounds of a real season (the test world only has fixtures of rounds 1 and 2). */
+const TOTAL_ROUNDS = 38;
 
 /** 20 clubs, rounds 1 and 2 with 10 fixtures each; the user's club 1 plays club 2 at home in round 1. */
 const world = () => {
@@ -88,6 +91,7 @@ const baseInput = (
 ): StartInput => ({
 	gameId: 7,
 	clubId: OWN,
+	seasonNo: 1,
 	currentRound: 1,
 	fixtures: w.fixtures,
 	squads: w.squads,
@@ -291,11 +295,14 @@ describe("exitMatch / isAbandoned / aiTakeover", () => {
 		const takeovers = r.changes.filter((c) => c.kind === "takeover");
 		expect(takeovers).toEqual([{ minute: 37, by: "ai", kind: "takeover" }]);
 		expect(aiTakeover(r.changes)).toBe(37);
-		const finish = finishRound({
-			...row,
-			minute: r.minute,
-			changes: r.changes,
-		});
+		const finish = finishRound(
+			{
+				...row,
+				minute: r.minute,
+				changes: r.changes,
+			},
+			TOTAL_ROUNDS,
+		);
 		expect(finish.ok).toBe(true);
 	});
 
@@ -381,7 +388,7 @@ describe("finishRound", () => {
 	it("przed 90' -> blad", () => {
 		const w = world();
 		const row = atMinute(started(baseInput(w)), 89);
-		expect(errorOf(finishRound(row))).toBe("Mecz jeszcze trwa.");
+		expect(errorOf(finishRound(row, TOTAL_ROUNDS))).toBe("Mecz jeszcze trwa.");
 	});
 
 	it("zapisuje 10 wynikow kolejki i stan wszystkich zawodnikow kadr klubow, ktore graly", () => {
@@ -392,9 +399,10 @@ describe("finishRound", () => {
 			started(baseInput(w, { states: new Map([[reserve, injured(3)]]) })),
 			90,
 		);
-		const r = finishRound(row);
+		const r = finishRound(row, TOTAL_ROUNDS);
 		if (!r.ok) throw new Error(r.error);
-		expect(r.nextRound).toBe(2);
+		expect(r.from).toEqual({ seasonNo: 1, round: 1 });
+		expect(r.next).toEqual({ seasonNo: 1, round: 2, seasonEnded: false });
 		expect(r.results).toHaveLength(10);
 		expect(new Set(r.results.map((x) => x.fixtureId)).size).toBe(10);
 		const live = playLive(row.setup, row.seed, row.changes, 90);
@@ -425,12 +433,13 @@ describe("finishRound", () => {
 
 	it("bez zmian kolejka 2 startuje ze stanem po kolejce 1", () => {
 		const w = world();
-		const r = finishRound(atMinute(started(baseInput(w)), 90));
+		const r = finishRound(atMinute(started(baseInput(w)), 90), TOTAL_ROUNDS);
 		if (!r.ok) throw new Error(r.error);
 		const states = new Map(r.states.map((s) => [s.playerId, s.state]));
 		const next = startRound(
 			baseInput(w, {
-				currentRound: r.nextRound,
+				seasonNo: r.next.seasonNo,
+				currentRound: r.next.round,
 				states,
 				existing: "finished",
 			}),
@@ -438,6 +447,46 @@ describe("finishRound", () => {
 		expect(next.ok).toBe(true);
 		expect(next.ok && next.row.setup.away.clubId).toBe(OWN);
 		expect(next.ok && next.row.setup.userSide).toBe("away");
+	});
+
+	it("w ostatniej kolejce sezonu: nastepna pozycja to 1. kolejka kolejnego sezonu", () => {
+		const w = world();
+		const row = atMinute(
+			started(baseInput(w, { seasonNo: 3, currentRound: 2 })),
+			90,
+		);
+		expect(row.seasonNo).toBe(3);
+		const r = finishRound(row, 2);
+		if (!r.ok) throw new Error(r.error);
+		expect(r.from).toEqual({ seasonNo: 3, round: 2 });
+		expect(r.next).toEqual({ seasonNo: 4, round: 1, seasonEnded: true });
+		expect(r.results).toHaveLength(10);
+	});
+});
+
+describe("nextPosition", () => {
+	it("37 -> 38 tego samego sezonu", () => {
+		expect(nextPosition({ seasonNo: 1, round: 37 }, 38)).toEqual({
+			seasonNo: 1,
+			round: 38,
+			seasonEnded: false,
+		});
+	});
+
+	it("38 -> 1. kolejka kolejnego sezonu", () => {
+		expect(nextPosition({ seasonNo: 1, round: 38 }, 38)).toEqual({
+			seasonNo: 2,
+			round: 1,
+			seasonEnded: true,
+		});
+	});
+
+	it("1. kolejka sezonu 2 -> 2. kolejka sezonu 2", () => {
+		expect(nextPosition({ seasonNo: 2, round: 1 }, 38)).toEqual({
+			seasonNo: 2,
+			round: 2,
+			seasonEnded: false,
+		});
 	});
 });
 

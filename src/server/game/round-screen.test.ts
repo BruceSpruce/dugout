@@ -32,6 +32,7 @@ const fixtures = pairs.flatMap(([h, a], i) => {
 
 const base: RoundScreenInput = {
 	clubId: 1,
+	seasonNo: 1,
 	currentRound: 1,
 	totalRounds: 3,
 	clubs,
@@ -132,12 +133,14 @@ describe("aiFinished", () => {
 		],
 		liveMatch: {
 			status: "finished",
+			seasonNo: 1,
 			round: 1,
 			fixtureId: 1,
 			changes: [
 				{ minute: 20, by: "player", kind: "sub", out: 11, in: 12 },
 				{ minute: 37, by: "ai", kind: "takeover" },
 			],
+			result: { homeGoals: 2, awayGoals: 1 },
 		},
 	};
 
@@ -159,6 +162,46 @@ describe("aiFinished", () => {
 			{ ...afterRound1, liveMatch: { ...live, status: "live" } },
 			{ ...afterRound1, currentRound: 3 },
 			{ ...afterRound1, liveMatch: null },
+		];
+		for (const v of variants) expect(buildRoundScreen(v).aiFinished).toBeNull();
+	});
+
+	// Season 1 ended with the AI playing out the last round (fixture 5: Delta 1-3 Bravo); the
+	// game is in round 1 of season 2 and its results hold season 2 only (none yet).
+	const seasonTurn: RoundScreenInput = {
+		...base,
+		seasonNo: 2,
+		currentRound: 1,
+		results: [],
+		liveMatch: {
+			status: "finished",
+			seasonNo: 1,
+			round: 3,
+			fixtureId: 5,
+			changes: [{ minute: 60, by: "ai", kind: "takeover" }],
+			result: { homeGoals: 1, awayGoals: 3 },
+		},
+	};
+
+	it("round 1 of season 2: the last round of season 1, score from the live row", () => {
+		const s = buildRoundScreen(seasonTurn);
+		expect(s.aiFinished).toEqual({
+			home: "Delta",
+			away: "Bravo",
+			score: { home: 1, away: 3 },
+			fromMinute: 60,
+		});
+		expect(s.previousRound).toBeNull();
+	});
+
+	it("null in round 2 of season 2, for the same round of the same season and in season 1", () => {
+		const live = seasonTurn.liveMatch;
+		if (!live) throw new Error("fixture");
+		const variants: RoundScreenInput[] = [
+			{ ...seasonTurn, currentRound: 2 },
+			{ ...seasonTurn, liveMatch: { ...live, seasonNo: 2 } },
+			{ ...seasonTurn, seasonNo: 1, liveMatch: { ...live, seasonNo: 0 } },
+			{ ...seasonTurn, liveMatch: { ...live, result: null } },
 		];
 		for (const v of variants) expect(buildRoundScreen(v).aiFinished).toBeNull();
 	});

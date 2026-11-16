@@ -192,6 +192,8 @@ export const game = createTable(
 			.notNull()
 			.references(() => club.id),
 		currentRound: integer("current_round").notNull().default(1),
+		// Season of the game, from 1; every season replays the same fixtures.
+		seasonNo: integer("season_no").notNull().default(1),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
 			.notNull()
 			.defaultNow(),
@@ -206,6 +208,7 @@ export const gameResult = createTable(
 		gameId: integer("game_id")
 			.notNull()
 			.references(() => game.id, { onDelete: "cascade" }),
+		seasonNo: integer("season_no").notNull().default(1),
 		fixtureId: integer("fixture_id")
 			.notNull()
 			.references(() => fixture.id),
@@ -213,7 +216,11 @@ export const gameResult = createTable(
 		awayGoals: integer("away_goals").notNull(),
 	},
 	(t) => [
-		unique("game_result_game_fixture_uq").on(t.gameId, t.fixtureId),
+		unique("game_result_game_season_fixture_uq").on(
+			t.gameId,
+			t.seasonNo,
+			t.fixtureId,
+		),
 		index("game_result_fixture_idx").on(t.fixtureId),
 	],
 );
@@ -265,6 +272,7 @@ export const gameLiveMatch = createTable(
 		fixtureId: integer("fixture_id")
 			.notNull()
 			.references(() => fixture.id),
+		seasonNo: integer("season_no").notNull().default(1),
 		round: integer().notNull(),
 		seed: integer().notNull(),
 		setup: jsonb().$type<LiveSetup>().notNull(),

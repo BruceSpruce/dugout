@@ -9,6 +9,7 @@ import {
 	insertLiveRow,
 	loadLiveRow,
 	loadStartInput,
+	loadTotalRounds,
 	loadViewContext,
 	lockLiveRow,
 	lockLiveRowAged,
@@ -60,7 +61,8 @@ type Tx = Parameters<Parameters<Ctx["db"]["transaction"]>[0]>[0];
 
 /**
  * The end of the round inside a transaction, shared by finish, exit and settle: conditional
- * takeover of the live row at minute 90, then results, player states and current_round + 1.
+ * takeover of the live row at minute 90, then results, player states and the next round (or
+ * round 1 of the next season after the last round).
  */
 async function finishInTx(tx: Tx, gameId: number) {
 	const row = await claimFinish(tx, gameId);
@@ -69,7 +71,11 @@ async function finishInTx(tx: Tx, gameId: number) {
 			"Nie ma meczu do zakończenia (mecz nie trwa albo nie doszedł do 90. minuty).",
 		);
 	}
-	const finish = finishRound(row);
+	const totalRounds = await loadTotalRounds(tx, gameId);
+	if (!totalRounds) {
+		throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+	}
+	const finish = finishRound(row, totalRounds);
 	if (!finish.ok) throw bad(finish.error);
 	try {
 		await writeRoundFinish(tx, gameId, finish);
@@ -79,7 +85,8 @@ async function finishInTx(tx: Tx, gameId: number) {
 	}
 	return {
 		round: row.round,
-		nextRound: finish.nextRound,
+		nextRound: finish.next.round,
+		seasonEnded: finish.next.seasonEnded,
 		results: finish.results.length,
 		states: finish.states.length,
 	};
@@ -167,7 +174,8 @@ export const matchRouter = createTRPCRouter({
 
 	/**
 	 * Ends the round in one transaction: conditional takeover of the live row at minute 90, then
-	 * results, player states and current_round = round + 1. A second finish is BAD_REQUEST.
+	 * results, player states and the next round (round 1 of the next season after the last one).
+	 * A second finish is BAD_REQUEST.
 	 */
 	finish: publicProcedure
 		.input(z.object({ gameId }))
