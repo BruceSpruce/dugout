@@ -1,4 +1,5 @@
 # Daily API-Football download for Dugout (see scripts/daily-fetch.ts).
+# Template: install.sh fills @WORKDIR@, @PATH@ and @NPM@.
 # Install: npm run daily:install   Logs: journalctl --user -u dugout-daily-fetch
 [Unit]
 Description=Dugout daily league download (API-Football Free quota)

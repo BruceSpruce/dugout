@@ -17,7 +17,7 @@ Dugout is a single-user, offline Premier League football manager game. Stack: T3
 - `src/server/db/` — Drizzle schema (@src/server/db/schema.ts) and client.
 - `src/trpc/` — client/server tRPC helpers.
 - `drizzle/` — committed SQL migrations; `scripts/` — thin CLI entry points.
-- `context/` — PRD, tech stack, change plans and logs.
+- `context/` — PRD, tech stack, change plans and logs. Local only: it is in `.gitignore` and not part of the public repo, so `@context/...` references resolve only in the maintainer's copy.
 
 ## Commands
 
