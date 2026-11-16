@@ -127,12 +127,13 @@ export const gameRouter = createTRPCRouter({
 				input.gameId,
 				input.seasonNo,
 			);
-			return seasonSummary({
+			const summary = seasonSummary({
 				seasonNo: input.seasonNo,
 				clubs: g.clubs,
 				results,
 				userClubId: g.clubId,
 			});
+			return { ...summary, userClubId: g.clubId };
 		}),
 
 	history: publicProcedure
@@ -143,11 +144,12 @@ export const gameRouter = createTRPCRouter({
 				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
 			}
 			const rows = await loadCompletedResults(ctx.db, input.gameId, g.seasonNo);
-			return gameHistory({
+			const history = gameHistory({
 				clubs: g.clubs,
 				seasons: completedSeasons(rows, g.seasonNo),
 				userClubId: g.clubId,
 			});
+			return { ...history, userClubId: g.clubId };
 		}),
 
 	lineup: publicProcedure

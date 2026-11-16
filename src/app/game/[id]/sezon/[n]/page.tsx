@@ -6,6 +6,8 @@ import { api } from "~/trpc/server";
 
 export const dynamic = "force-dynamic";
 
+const MAX_INT = 2147483647;
+
 /** Polish decimal format (comma), fixed digits. */
 const num = (v: number, digits: number) =>
 	v.toLocaleString("pl-PL", {
@@ -22,24 +24,21 @@ export default async function SeasonSummaryPage({
 	if (!/^[1-9]\d*$/.test(id) || !/^[1-9]\d*$/.test(n)) notFound();
 	const gameId = Number(id);
 	const seasonNo = Number(n);
-	if (!Number.isSafeInteger(gameId) || !Number.isSafeInteger(seasonNo)) {
-		notFound();
-	}
+	// Postgres integer range, as in the router's zod schema: larger ids are a 404, not a 500.
+	if (gameId > MAX_INT || seasonNo > MAX_INT) notFound();
 
 	// The AI finished an abandoned match: the round screen shows the notice.
 	const { settled } = await api.match.settle({ gameId });
 	if (settled) redirect(`/game/${gameId}`);
 
 	let data: Awaited<ReturnType<typeof api.game.season>>;
-	let userClubId: number;
 	try {
 		data = await api.game.season({ gameId, seasonNo });
-		userClubId = (await api.game.roundScreen({ gameId })).clubId;
 	} catch (e) {
 		if (e instanceof TRPCError && e.code === "NOT_FOUND") notFound();
 		throw e;
 	}
-	const { user, stats, table } = data;
+	const { user, stats, table, userClubId } = data;
 
 	return (
 		<main className="flex min-h-screen flex-col items-center gap-8 bg-gradient-to-b from-[#0b3d1f] to-[#071a0e] px-4 py-10 text-white">

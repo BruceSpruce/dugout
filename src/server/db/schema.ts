@@ -208,7 +208,7 @@ export const gameResult = createTable(
 		gameId: integer("game_id")
 			.notNull()
 			.references(() => game.id, { onDelete: "cascade" }),
-		seasonNo: integer("season_no").notNull().default(1),
+		seasonNo: integer("season_no").notNull(),
 		fixtureId: integer("fixture_id")
 			.notNull()
 			.references(() => fixture.id),
@@ -272,7 +272,7 @@ export const gameLiveMatch = createTable(
 		fixtureId: integer("fixture_id")
 			.notNull()
 			.references(() => fixture.id),
-		seasonNo: integer("season_no").notNull().default(1),
+		seasonNo: integer("season_no").notNull(),
 		round: integer().notNull(),
 		seed: integer().notNull(),
 		setup: jsonb().$type<LiveSetup>().notNull(),
