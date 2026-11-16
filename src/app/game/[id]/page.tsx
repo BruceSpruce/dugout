@@ -43,18 +43,44 @@ export default async function GamePage({
 				</Link>
 				<div className="mt-2 flex items-center justify-between gap-4">
 					<h1 className="text-3xl font-extrabold">{screen.clubName}</h1>
-					<Link
-						className="rounded bg-white/15 px-3 py-1.5 font-semibold hover:bg-white/25"
-						href={`/game/${gameId}/sklad`}
-					>
-						Skład
-					</Link>
+					<div className="flex gap-2">
+						{screen.seasonNo > 1 ? (
+							<Link
+								className="rounded bg-white/15 px-3 py-1.5 font-semibold hover:bg-white/25"
+								href={`/game/${gameId}/historia`}
+							>
+								Historia
+							</Link>
+						) : null}
+						<Link
+							className="rounded bg-white/15 px-3 py-1.5 font-semibold hover:bg-white/25"
+							href={`/game/${gameId}/sklad`}
+						>
+							Skład
+						</Link>
+					</div>
 				</div>
 				<p className="text-green-100">
 					Sezon {screen.seasonNo} · Kolejka {screen.round} /{" "}
 					{screen.totalRounds}
 				</p>
 			</div>
+
+			{screen.lastSeason ? (
+				<section className="w-full max-w-3xl rounded-lg bg-yellow-400/15 p-4 text-yellow-200">
+					<p className="font-semibold">
+						Sezon {screen.lastSeason.seasonNo} zakończony: mistrz{" "}
+						{screen.lastSeason.champion}, Twoje miejsce{" "}
+						{screen.lastSeason.position}
+					</p>
+					<Link
+						className="mt-2 inline-block rounded bg-yellow-400 px-3 py-1.5 font-bold text-[#071a0e] hover:bg-yellow-300"
+						href={`/game/${gameId}/sezon/${screen.lastSeason.seasonNo}`}
+					>
+						Podsumowanie
+					</Link>
+				</section>
+			) : null}
 
 			<section className="w-full max-w-3xl rounded-lg bg-white/10 p-4">
 				{screen.aiFinished ? (

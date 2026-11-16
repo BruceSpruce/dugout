@@ -6,6 +6,13 @@ import { api } from "~/trpc/server";
 
 export const dynamic = "force-dynamic";
 
+/** Polish decimal format (comma), fixed digits. */
+const num = (v: number, digits: number) =>
+	v.toLocaleString("pl-PL", {
+		minimumFractionDigits: digits,
+		maximumFractionDigits: digits,
+	});
+
 export default async function SeasonSummaryPage({
 	params,
 }: {
@@ -115,10 +122,10 @@ export default async function SeasonSummaryPage({
 				<h2 className="mb-2 text-xl font-bold">Statystyki ligi</h2>
 				<ul className="flex flex-col gap-1">
 					<li>Mecze: {stats.matches}</li>
-					<li>Gole na mecz: {stats.goalsPerMatch.toFixed(2)}</li>
-					<li>Wygrane gospodarzy: {stats.homeWinPct.toFixed(1)}%</li>
-					<li>Remisy: {stats.drawPct.toFixed(1)}%</li>
-					<li>Wygrane gości: {stats.awayWinPct.toFixed(1)}%</li>
+					<li>Gole na mecz: {num(stats.goalsPerMatch, 2)}</li>
+					<li>Wygrane gospodarzy: {num(stats.homeWinPct, 1)}%</li>
+					<li>Remisy: {num(stats.drawPct, 1)}%</li>
+					<li>Wygrane gości: {num(stats.awayWinPct, 1)}%</li>
 				</ul>
 			</section>
 		</main>
