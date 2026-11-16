@@ -79,6 +79,18 @@ export async function loadRoundScreenInput(
 		sql`select fixture_id, home_goals, away_goals from dugout_game_result
 			where game_id = ${gameId} and season_no = ${g.season_no}`,
 	);
+	// The season just completed, only while the new one has no results (round-screen tile).
+	const previousRows =
+		g.season_no > 1 && g.current_round === 1 && resultRows.length === 0
+			? await db.execute<{
+					fixture_id: number;
+					home_goals: number;
+					away_goals: number;
+				}>(
+					sql`select fixture_id, home_goals, away_goals from dugout_game_result
+						where game_id = ${gameId} and season_no = ${g.season_no - 1}`,
+				)
+			: [];
 	const [live] = await db
 		.select({
 			status: gameLiveMatch.status,
@@ -120,6 +132,11 @@ export async function loadRoundScreenInput(
 			awayClubId: f.away_club_id,
 		})),
 		results: resultRows.map((r) => ({
+			fixtureId: r.fixture_id,
+			homeGoals: r.home_goals,
+			awayGoals: r.away_goals,
+		})),
+		previousSeasonResults: previousRows.map((r) => ({
 			fixtureId: r.fixture_id,
 			homeGoals: r.home_goals,
 			awayGoals: r.away_goals,

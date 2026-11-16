@@ -3,6 +3,7 @@
 import { leagueTable, type TableRow } from "~/engine/club-strength";
 import type { LiveChange } from "~/engine/live-match";
 import { aiTakeover, type LiveStatus } from "./match-flow";
+import { seasonSummary } from "./season-summary";
 
 export type RoundScreenInput = {
 	clubId: number;
@@ -19,6 +20,15 @@ export type RoundScreenInput = {
 		awayClubId: number;
 	}[];
 	results: { fixtureId: number; homeGoals: number; awayGoals: number }[];
+	/**
+	 * Results of season seasonNo - 1; loaded only for round 1 of a season > 1 before any
+	 * current-season result exists (empty otherwise).
+	 */
+	previousSeasonResults: {
+		fixtureId: number;
+		homeGoals: number;
+		awayGoals: number;
+	}[];
 	/** The game's game_live_match row (only what the screen needs); null when none. */
 	liveMatch: {
 		status: LiveStatus;
@@ -34,6 +44,7 @@ export type RoundScreenInput = {
 export type RoundScreen = {
 	clubId: number;
 	clubName: string;
+	seasonNo: number;
 	round: number;
 	totalRounds: number;
 	nextMatch: {
@@ -60,6 +71,8 @@ export type RoundScreen = {
 		score: { home: number; away: number };
 		fromMinute: number;
 	} | null;
+	/** Round 1 of a season > 1, before its matches: the season just completed. */
+	lastSeason: { seasonNo: number; champion: string; position: number } | null;
 };
 
 export function buildRoundScreen(input: RoundScreenInput): RoundScreen {
@@ -68,21 +81,34 @@ export function buildRoundScreen(input: RoundScreenInput): RoundScreen {
 	const nameOf = (id: number) => names.get(id) ?? `#${id}`;
 	const fixtureById = new Map(fixtures.map((f) => [f.fixtureId, f]));
 
-	const played = results.flatMap((r) => {
-		const f = fixtureById.get(r.fixtureId);
-		return f
-			? [
-					{
-						fixtureId: f.fixtureId,
-						round: f.round,
-						homeClubId: f.homeClubId,
-						awayClubId: f.awayClubId,
-						homeGoals: r.homeGoals,
-						awayGoals: r.awayGoals,
-					},
-				]
-			: [];
-	});
+	const withFixtures = (rs: RoundScreenInput["results"]) =>
+		rs.flatMap((r) => {
+			const f = fixtureById.get(r.fixtureId);
+			return f
+				? [
+						{
+							fixtureId: f.fixtureId,
+							round: f.round,
+							homeClubId: f.homeClubId,
+							awayClubId: f.awayClubId,
+							homeGoals: r.homeGoals,
+							awayGoals: r.awayGoals,
+						},
+					]
+				: [];
+		});
+	const played = withFixtures(results);
+
+	const lastSeasonNo = input.seasonNo - 1;
+	const last =
+		lastSeasonNo >= 1 && currentRound === 1 && results.length === 0
+			? seasonSummary({
+					seasonNo: lastSeasonNo,
+					clubs,
+					results: withFixtures(input.previousSeasonResults),
+					userClubId: clubId,
+				})
+			: null;
 
 	const next = fixtures
 		.filter(
@@ -101,6 +127,7 @@ export function buildRoundScreen(input: RoundScreenInput): RoundScreen {
 		aiFinished: aiFinishedOf(input, nameOf),
 		clubId,
 		clubName: nameOf(clubId),
+		seasonNo: input.seasonNo,
 		round: currentRound,
 		totalRounds,
 		nextMatch: next
@@ -129,6 +156,13 @@ export function buildRoundScreen(input: RoundScreenInput): RoundScreen {
 							})),
 					}
 				: null,
+		lastSeason: last
+			? {
+					seasonNo: last.seasonNo,
+					champion: last.champion,
+					position: last.user.position,
+				}
+			: null,
 	};
 }
 

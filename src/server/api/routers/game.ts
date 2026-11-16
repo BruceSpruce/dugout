@@ -20,9 +20,20 @@ import {
 	loadRoundScreenInput,
 	loadSeasonClubs,
 } from "~/server/game/load-round-screen";
+import {
+	loadCompletedResults,
+	loadSeasonGame,
+	loadSeasonResults,
+} from "~/server/game/load-season";
 import { buildRoundScreen } from "~/server/game/round-screen";
+import {
+	completedSeasons,
+	gameHistory,
+	seasonSummary,
+} from "~/server/game/season-summary";
 
 const GAME_NOT_FOUND = "Nie ma takiej gry";
+const SEASON_NOT_COMPLETED = "Ten sezon się jeszcze nie zakończył";
 const MAX_INT = 2147483647;
 const id = z.number().int().positive().max(MAX_INT);
 const gameId = id;
@@ -95,6 +106,48 @@ export const gameRouter = createTRPCRouter({
 				});
 			}
 			return buildRoundScreen(data);
+		}),
+
+	season: publicProcedure
+		.input(z.object({ gameId, seasonNo: id }))
+		.query(async ({ ctx, input }) => {
+			const g = await loadSeasonGame(ctx.db, input.gameId);
+			if (!g) {
+				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+			}
+			// Only completed seasons: the current one is still running, later ones do not exist.
+			if (input.seasonNo >= g.seasonNo) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: SEASON_NOT_COMPLETED,
+				});
+			}
+			const results = await loadSeasonResults(
+				ctx.db,
+				input.gameId,
+				input.seasonNo,
+			);
+			return seasonSummary({
+				seasonNo: input.seasonNo,
+				clubs: g.clubs,
+				results,
+				userClubId: g.clubId,
+			});
+		}),
+
+	history: publicProcedure
+		.input(z.object({ gameId }))
+		.query(async ({ ctx, input }) => {
+			const g = await loadSeasonGame(ctx.db, input.gameId);
+			if (!g) {
+				throw new TRPCError({ code: "NOT_FOUND", message: GAME_NOT_FOUND });
+			}
+			const rows = await loadCompletedResults(ctx.db, input.gameId, g.seasonNo);
+			return gameHistory({
+				clubs: g.clubs,
+				seasons: completedSeasons(rows, g.seasonNo),
+				userClubId: g.clubId,
+			});
 		}),
 
 	lineup: publicProcedure

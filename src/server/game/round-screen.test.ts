@@ -38,6 +38,7 @@ const base: RoundScreenInput = {
 	clubs,
 	fixtures,
 	results: [],
+	previousSeasonResults: [],
 	liveMatch: null,
 };
 
@@ -204,5 +205,43 @@ describe("aiFinished", () => {
 			{ ...seasonTurn, liveMatch: { ...live, result: null } },
 		];
 		for (const v of variants) expect(buildRoundScreen(v).aiFinished).toBeNull();
+	});
+});
+
+describe("buildRoundScreen lastSeason", () => {
+	// Season 1 by fixture: Bravo 5, Delta 4, Charlie 4, Alfa 3 (as in season-summary.test.ts).
+	const season1 = [
+		{ fixtureId: 1, homeGoals: 2, awayGoals: 0 },
+		{ fixtureId: 2, homeGoals: 1, awayGoals: 1 },
+		{ fixtureId: 3, homeGoals: 0, awayGoals: 1 },
+		{ fixtureId: 4, homeGoals: 3, awayGoals: 0 },
+		{ fixtureId: 5, homeGoals: 2, awayGoals: 2 },
+		{ fixtureId: 6, homeGoals: 1, awayGoals: 0 },
+	];
+	const turn: RoundScreenInput = {
+		...base,
+		seasonNo: 2,
+		currentRound: 1,
+		previousSeasonResults: season1,
+	};
+
+	it("round 1 of season 2 before its matches: champion and the user's position", () => {
+		const s = buildRoundScreen(turn);
+		expect(s.seasonNo).toBe(2);
+		expect(s.lastSeason).toEqual({
+			seasonNo: 1,
+			champion: "Bravo",
+			position: 2,
+		});
+	});
+
+	it("null once a current-season result exists, in later rounds and in season 1", () => {
+		const variants: RoundScreenInput[] = [
+			{ ...turn, results: [{ fixtureId: 1, homeGoals: 0, awayGoals: 0 }] },
+			{ ...turn, currentRound: 2 },
+			{ ...turn, seasonNo: 1 },
+		];
+		for (const v of variants) expect(buildRoundScreen(v).lastSeason).toBeNull();
+		expect(buildRoundScreen(base).seasonNo).toBe(1);
 	});
 });
