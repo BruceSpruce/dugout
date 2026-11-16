@@ -4,13 +4,23 @@
 
 import type { createTranslator, Messages } from "next-intl";
 
-import { AppError, type AppErrorData } from "~/server/app-error";
+import {
+	AppError,
+	type AppErrorCode,
+	type AppErrorData,
+} from "~/server/app-error";
 
 /** Root translator: `useTranslations()`, `await getTranslations()` or `createTranslator`. */
 export type ErrorTranslator = ReturnType<typeof createTranslator<Messages>>;
 
 /** Keys of `errors.*`: every AppErrorCode plus UI fallbacks (unknown, startFailed, ...). */
 export type ErrorKey = keyof Messages["errors"];
+
+/** Compile-time check: every AppErrorCode has an `errors.<code>` message (en.json is the source). */
+type UntranslatedCodes = Exclude<AppErrorCode, ErrorKey>;
+export const ALL_ERROR_CODES_TRANSLATED: [UntranslatedCodes] extends [never]
+	? true
+	: UntranslatedCodes = true;
 
 /** The typed translator seen with runtime-built keys (`errors.${code}`). */
 type LooseTranslator = {

@@ -102,3 +102,56 @@ describe("messages parity", () => {
 		}
 	});
 });
+
+/** Branch keywords of every `{arg, plural, ...}` in a message (top level of the plural body). */
+function pluralBranches(message: string): Set<string>[] {
+	const out: Set<string>[] = [];
+	const re = /\{\s*\w+\s*,\s*plural\s*,/g;
+	for (let m = re.exec(message); m; m = re.exec(message)) {
+		const end = matchingBrace(message, m.index);
+		const body = message.slice(m.index + m[0].length, end);
+		const keys = new Set<string>();
+		let depth = 0;
+		let word = "";
+		for (const ch of body) {
+			if (ch === "{") {
+				if (depth === 0 && word.trim())
+					keys.add(word.trim().split(/\s+/).pop() ?? "");
+				depth++;
+				word = "";
+			} else if (ch === "}") depth--;
+			else if (depth === 0) word += ch;
+		}
+		out.push(keys);
+	}
+	return out;
+}
+
+describe("plural categories", () => {
+	it.each([
+		["pl", pl],
+		["en", en],
+	] as const)(
+		"every plural in %s covers the language's categories",
+		(locale, tree) => {
+			const needed = new Intl.PluralRules(locale).resolvedOptions()
+				.pluralCategories;
+			const gaps: string[] = [];
+			for (const [key, message] of flatten(tree as Tree)) {
+				for (const branches of pluralBranches(message)) {
+					const missing = needed.filter((c) => !branches.has(c));
+					if (missing.length > 0) gaps.push(`${key}: ${missing.join(",")}`);
+				}
+			}
+			expect(gaps).toEqual([]);
+		},
+	);
+
+	it("finds the branches of a plural", () => {
+		expect([
+			...(pluralBranches(
+				"{n, plural, one {# mecz} few {# mecze} other {# meczu}}",
+			)[0] ?? []),
+		]).toEqual(["one", "few", "other"]);
+	});
+});

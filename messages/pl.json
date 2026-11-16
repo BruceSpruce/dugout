@@ -71,7 +71,7 @@
 		"style": "Styl gry",
 		"aiProposal": "Propozycja AI",
 		"ratings": "Atak / Obrona",
-		"slotAria": "Slot {role} {index}",
+		"slotAria": "Miejsce {role} {index}",
 		"bench": "Ławka",
 		"benchAria": "Ławka {n}",
 		"save": "Zapisz",

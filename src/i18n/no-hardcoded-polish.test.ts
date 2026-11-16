@@ -1,6 +1,8 @@
 // Guard: player-visible text lives in messages/*.json, not in code. Scans source files of the
 // roots below for Polish diacritics outside comments (string and template literals, JSX text
 // in src/app). Tests, fixtures and the owner's CLI reports are excluded.
+// Limits (accepted): only Polish diacritics are detected, so Polish words without them and
+// hard-coded English slip through; src/i18n and src/trpc are not scanned. Review covers the rest.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
