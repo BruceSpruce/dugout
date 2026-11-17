@@ -143,7 +143,7 @@ export async function upsert<T extends PgTable>(
 	table: T,
 	values: T["$inferInsert"][],
 	target: Array<keyof T["_"]["columns"] & string>,
-	options: { keep?: string[] } = {},
+	options: { keep?: Array<keyof T["_"]["columns"] & string> } = {},
 ): Promise<{ rows: Array<Record<string, unknown>>; counts: TableCounts }> {
 	const cols = getTableColumns(table) as Record<
 		string,

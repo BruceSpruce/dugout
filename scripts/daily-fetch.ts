@@ -5,6 +5,8 @@
 // Run:   npm run daily:fetch [-- --max-requests 95]
 // State: .data/api-football/daily-state.json; one-line status: .data/api-football/daily-status.txt
 //        (shown by the Claude Code SessionStart hook); history: .data/api-football/daily.log
+// A `load: true` league that was first created by `npm run open:load` is fetched but not loaded
+// (`loadBlocked` in the state file); remove that field to retry the load.
 
 import { spawnSync } from "node:child_process";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";

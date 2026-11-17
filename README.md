@@ -27,7 +27,8 @@ cp .env.example .env              # set API_FOOTBALL_KEY; DATABASE_URL works wit
 ./start-database.sh               # starts the dugout-postgres container (answer y to generate a password)
 npm install
 npm run db:migrate
-npm run import:season -- --league 39 --season 2024   # optional: real squads for one league (needs your API key)
+npm run import:season -- --league 39 --season 2024   # optional: real squads for one league (needs your API key);
+                                                     # repeat daily until it exits with code 0, then continue
 npm run open:load                 # clubs and fixtures of 8 leagues from openfootball, no API key needed
 npm run dev                       # http://localhost:3000
 ```
