@@ -5,6 +5,7 @@
 		"includes": [
 			"**",
 			"!context",
+			"!data",
 			"!drizzle",
 			"!**/.claude/settings.local.json"
 		]
