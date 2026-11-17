@@ -7,6 +7,24 @@ import { useState } from "react";
 import { errorText } from "~/i18n/error-text";
 import { api } from "~/trpc/react";
 
+const COUNTRY_KEYS = new Set([
+	"England",
+	"Spain",
+	"Germany",
+	"Italy",
+	"France",
+	"Netherlands",
+	"Portugal",
+]);
+type CountryKey =
+	| "England"
+	| "Spain"
+	| "Germany"
+	| "Italy"
+	| "France"
+	| "Netherlands"
+	| "Portugal";
+
 type LeagueItem = {
 	competitionSeasonId: number;
 	name: string;
@@ -43,7 +61,10 @@ export function NewGame({ leagues }: { leagues: LeagueItem[] }) {
 									<span className="text-sm font-semibold">{l.name}</span>
 									<span className="text-xs text-white/70">
 										{t("home.leagueInfo", {
-											country: l.country ?? "",
+											country:
+												l.country && COUNTRY_KEYS.has(l.country)
+													? t(`countries.${l.country as CountryKey}`)
+													: (l.country ?? ""),
 											clubs: l.clubCount,
 										})}
 									</span>

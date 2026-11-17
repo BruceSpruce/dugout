@@ -21,6 +21,15 @@
 			"points": "Pkt"
 		}
 	},
+	"countries": {
+		"England": "Anglia",
+		"Spain": "Hiszpania",
+		"Germany": "Niemcy",
+		"Italy": "Włochy",
+		"France": "Francja",
+		"Netherlands": "Holandia",
+		"Portugal": "Portugalia"
+	},
 	"errors": {
 		"unknown": "Coś poszło nie tak.",
 		"startFailed": "Nie udało się rozpocząć meczu.",
@@ -30,7 +39,7 @@
 		"changeFailed": "Nie udało się wprowadzić zmiany.",
 		"proposalFailed": "Nie udało się pobrać propozycji.",
 		"gameNotFound": "Nie ma takiej gry.",
-		"seasonNotLoaded": "Sezon nie jest załadowany — uruchom npm run import:season",
+		"seasonNotLoaded": "Sezon nie jest załadowany — uruchom npm run open:load",
 		"seasonNotCompleted": "Ten sezon się jeszcze nie zakończył.",
 		"clubNotInSeason": "Ten klub nie gra w załadowanym sezonie.",
 		"leagueNoSquads": "Ta liga nie ma jeszcze kadr — nie można w niej zacząć gry.",

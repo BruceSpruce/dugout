@@ -27,12 +27,14 @@ cp .env.example .env              # set API_FOOTBALL_KEY; DATABASE_URL works wit
 ./start-database.sh               # starts the dugout-postgres container (answer y to generate a password)
 npm install
 npm run db:migrate
+npm run import:season -- --league 39 --season 2024   # optional: real squads for one league (needs your API key)
 npm run open:load                 # clubs and fixtures of 8 leagues from openfootball, no API key needed
-npm run import:season -- --league 39 --season 2024   # real squads for one league (needs your API key)
 npm run dev                       # http://localhost:3000
 ```
 
-A league is playable only when its clubs have squads. After `open:load` the leagues without squads show up in the new-game screen but cannot be started yet (fictional squads come next); `import:season` loads real squads for a league with your own API key.
+If you already have a database, back it up (`pg_dump`) before `db:migrate`.
+
+A league is playable only when its clubs have squads. Run the optional `import:season` for a league with real squads (it needs your own API key and may take several days of free quota) **before** `open:load`. `open:load` then links those clubs to the openfootball names and adds the other leagues. A league first created by `open:load` cannot get real squads from the API later (coming in a later version); it shows up in the new-game screen but cannot be started yet (fictional squads come next).
 
 A full league season needs more requests than the free daily quota. `import:season` stops with exit code 2 when the budget runs out. Run it again the next day and it continues where it stopped.
 

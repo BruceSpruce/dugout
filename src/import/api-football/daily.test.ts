@@ -141,6 +141,44 @@ describe("runDaily", () => {
 		expect(loads).toEqual([39]);
 	});
 
+	it("fetches but skips the load of a league blocked by openfootball data, and does not retry it", async () => {
+		const { calls, fetchSeason } = fakeFetch({ 39: done(10), 140: partial(1) });
+		const loads: number[] = [];
+		const deps = {
+			client,
+			dataDir: "/x",
+			fetchSeason,
+			load: async (e: QueueEntry) => {
+				loads.push(e.league);
+				return 0;
+			},
+			loadBlocked: async () => "blocked",
+			now,
+		};
+
+		const r = await runDaily(queue, {}, deps);
+
+		expect(calls).toEqual([39, 140]);
+		expect(loads).toEqual([]);
+		expect(r.outcomes[0]).toMatchObject({
+			status: "complete",
+			loadBlocked: "blocked",
+		});
+		expect(r.state["39-2024"]).toEqual(
+			expect.objectContaining({ complete: true, loadBlocked: "blocked" }),
+		);
+		expect(r.state["39-2024"]?.loadExit).toBeUndefined();
+
+		// next day: complete and blocked -> skipped, not fetched again
+		const again = fakeFetch({ 140: partial(1) });
+		const r2 = await runDaily(queue, r.state, {
+			...deps,
+			fetchSeason: again.fetchSeason,
+		});
+		expect(again.calls).toEqual([140]);
+		expect(r2.outcomes[0]?.status).toBe("skipped");
+	});
+
 	it("stops without recording when the budget is already gone", async () => {
 		const { calls, fetchSeason } = fakeFetch({ 39: "budget" });
 

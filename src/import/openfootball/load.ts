@@ -2,11 +2,12 @@
 // A league already loaded from API-Football (fixtures with api_id) is only matched: openfootball
 // club keys are stored in club.source_key. Otherwise rows are created, keyed by source_key.
 
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 
 import {
 	type Db,
 	idMap,
+	lockSeason,
 	type TableCounts,
 	upsert,
 } from "~/import/api-football/load";
@@ -29,6 +30,20 @@ export function openLoadMode(input: {
 	);
 }
 
+/** Club keys of this league file that already play in another league of the same season. */
+export function clubKeyClashes(
+	rows: Array<{ sourceKey: string | null; leagueApiId: number }>,
+	ownLeagueApiId: number,
+): string[] {
+	return [
+		...new Set(
+			rows
+				.filter((r) => r.sourceKey !== null && r.leagueApiId !== ownLeagueApiId)
+				.map((r) => r.sourceKey as string),
+		),
+	].sort();
+}
+
 export type OpenLoadResult =
 	| { mode: "matched"; clubs: number }
 	| {
@@ -44,6 +59,7 @@ export async function loadOpenSeason(
 ): Promise<OpenLoadResult> {
 	return db.transaction(async (tx) => {
 		const { leagueApiId, season } = n.competition;
+		await lockSeason(tx, leagueApiId, season);
 		const [cs] = await tx
 			.select({ id: competitionSeason.id })
 			.from(competitionSeason)
@@ -90,6 +106,36 @@ export async function loadOpenSeason(
 			return { mode: "matched", clubs: map.size } as const;
 		}
 
+		const clashRows = await tx
+			.selectDistinct({
+				sourceKey: club.sourceKey,
+				leagueApiId: competitionSeason.leagueApiId,
+			})
+			.from(fixture)
+			.innerJoin(
+				competitionSeason,
+				eq(competitionSeason.id, fixture.competitionSeasonId),
+			)
+			.innerJoin(
+				club,
+				or(eq(club.id, fixture.homeClubId), eq(club.id, fixture.awayClubId)),
+			)
+			.where(
+				and(
+					eq(competitionSeason.season, season),
+					ne(competitionSeason.leagueApiId, leagueApiId),
+					inArray(
+						club.sourceKey,
+						n.clubs.map((c) => c.sourceKey),
+					),
+				),
+			);
+		const clashes = clubKeyClashes(clashRows, leagueApiId);
+		if (clashes.length > 0)
+			throw new Error(
+				`Clubs of league ${leagueApiId} season ${season} already play in another league of the same season (same name?): ${clashes.join(", ")}`,
+			);
+
 		const compRes = await upsert(
 			tx,
 			competitionSeason,
@@ -113,7 +159,7 @@ export async function loadOpenSeason(
 				country: c.country,
 			})),
 			["sourceKey"],
-			{ keep: ["apiId"] },
+			{ keep: ["apiId", "code", "logoUrl", "name"] },
 		);
 		const clubIds = idMap<string>(clubRes.rows, "sourceKey");
 		const need = (key: string) => {
@@ -134,6 +180,14 @@ export async function loadOpenSeason(
 			["sourceKey"],
 			{ keep: ["apiId"] },
 		);
+		const [stored] = await tx
+			.select({ n: sql<number>`count(*)::int` })
+			.from(fixture)
+			.where(eq(fixture.competitionSeasonId, competitionSeasonId));
+		if (stored?.n !== n.fixtures.length)
+			throw new Error(
+				`League ${leagueApiId} season ${season}: ${stored?.n} fixtures in the database after load, expected ${n.fixtures.length}; rolled back.`,
+			);
 		return {
 			mode: "created",
 			clubs: clubRes.counts,

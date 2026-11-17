@@ -21,6 +21,15 @@
 			"points": "Pts"
 		}
 	},
+	"countries": {
+		"England": "England",
+		"Spain": "Spain",
+		"Germany": "Germany",
+		"Italy": "Italy",
+		"France": "France",
+		"Netherlands": "Netherlands",
+		"Portugal": "Portugal"
+	},
 	"errors": {
 		"unknown": "Something went wrong.",
 		"startFailed": "Could not start the match.",
@@ -30,7 +39,7 @@
 		"changeFailed": "Could not make the change.",
 		"proposalFailed": "Could not load the proposal.",
 		"gameNotFound": "No such game.",
-		"seasonNotLoaded": "The season is not loaded — run npm run import:season",
+		"seasonNotLoaded": "The season is not loaded — run npm run open:load",
 		"seasonNotCompleted": "This season has not finished yet.",
 		"clubNotInSeason": "This club does not play in the loaded season.",
 		"leagueNoSquads": "This league has no squads yet, so a game cannot be started in it.",

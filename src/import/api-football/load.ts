@@ -203,12 +203,65 @@ function need<K extends number | string>(
 }
 
 // A league loaded from openfootball has fixtures without api_id; an API upsert on
-// ON CONFLICT (api_id) would duplicate them, so it is refused (swap of squads is S-15).
+// ON CONFLICT (api_id) would duplicate them, so it is refused.
 export function apiLoadBlocked(counts: {
 	fixtures: number;
 	withoutApiId: number;
 }): boolean {
 	return counts.fixtures > 0 && counts.withoutApiId > 0;
+}
+
+export function apiLoadBlockedMessage(
+	league: number,
+	season: number,
+	withoutApiId: number,
+): string {
+	return `League ${league} season ${season} was loaded from openfootball (${withoutApiId} fixtures without api_id); loading it from API-Football would duplicate clubs and fixtures. Loading real squads into an openfootball league is not supported yet.`;
+}
+
+type Reader = Pick<Db, "select">;
+
+async function sourceCounts(db: Reader, league: number, season: number) {
+	const [existing] = await db
+		.select({
+			fixtures: count(),
+			withoutApiId: count(sql`case when ${isNull(fixture.apiId)} then 1 end`),
+		})
+		.from(fixture)
+		.innerJoin(
+			competitionSeason,
+			eq(competitionSeason.id, fixture.competitionSeasonId),
+		)
+		.where(
+			and(
+				eq(competitionSeason.leagueApiId, league),
+				eq(competitionSeason.season, season),
+			),
+		);
+	return existing ?? { fixtures: 0, withoutApiId: 0 };
+}
+
+/** Message when loading (league, season) from the API would be refused, else null. */
+export async function isApiLoadBlocked(
+	db: Db,
+	league: number,
+	season: number,
+): Promise<string | null> {
+	const c = await sourceCounts(db, league, season);
+	return apiLoadBlocked(c)
+		? apiLoadBlockedMessage(league, season, c.withoutApiId)
+		: null;
+}
+
+/** Serializes the loaders (API and openfootball) per league and season until commit. */
+export async function lockSeason(
+	tx: Tx,
+	league: number,
+	season: number,
+): Promise<void> {
+	await tx.execute(
+		sql`select pg_advisory_xact_lock(${league}::int, ${season}::int)`,
+	);
 }
 
 export async function loadSeason(
@@ -228,25 +281,11 @@ export async function loadSeason(
 	const people = normalizePlayers(files.playerPages, league);
 
 	return db.transaction(async (tx) => {
-		const [existing] = await tx
-			.select({
-				fixtures: count(),
-				withoutApiId: count(sql`case when ${isNull(fixture.apiId)} then 1 end`),
-			})
-			.from(fixture)
-			.innerJoin(
-				competitionSeason,
-				eq(competitionSeason.id, fixture.competitionSeasonId),
-			)
-			.where(
-				and(
-					eq(competitionSeason.leagueApiId, league),
-					eq(competitionSeason.season, season),
-				),
-			);
-		if (existing && apiLoadBlocked(existing))
+		await lockSeason(tx, league, season);
+		const existing = await sourceCounts(tx, league, season);
+		if (apiLoadBlocked(existing))
 			throw new Error(
-				`League ${league} season ${season} was loaded from openfootball (${existing.withoutApiId} fixtures without api_id); loading it from API-Football would duplicate clubs and fixtures. Swapping in real squads is S-15.`,
+				apiLoadBlockedMessage(league, season, existing.withoutApiId),
 			);
 
 		const compRes = await upsert(

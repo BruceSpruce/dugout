@@ -5,6 +5,12 @@
 
 import { spawnSync } from "node:child_process";
 
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+
+import { isApiLoadBlocked } from "../src/import/api-football/load";
+import * as schema from "../src/server/db/schema";
+
 function arg(name: string): string | undefined {
 	const i = process.argv.indexOf(`--${name}`);
 	return i > -1 ? process.argv[i + 1] : undefined;
@@ -24,7 +30,7 @@ function run(script: string, args: string[]): number {
 	return r.status ?? 1;
 }
 
-function main(): number {
+async function main(): Promise<number> {
 	if (arg("season") === undefined) {
 		console.error(
 			"Usage: npm run import:season -- --league 39 --season 2024 [--max-requests 95] [--max-page 3] [--min-interval-ms 6500]",
@@ -32,6 +38,27 @@ function main(): number {
 		return 1;
 	}
 	const common = flags(["league", "season"]);
+
+	// Refuse before fetch spends quota on a load that is bound to fail.
+	const url = process.env.DATABASE_URL;
+	if (!url) {
+		console.error("Missing DATABASE_URL (add it to .env).");
+		return 1;
+	}
+	const conn = postgres(url);
+	try {
+		const blocked = await isApiLoadBlocked(
+			drizzle(conn, { schema }),
+			Number(arg("league") ?? "39"),
+			Number(arg("season")),
+		);
+		if (blocked) {
+			console.error(blocked);
+			return 1;
+		}
+	} finally {
+		await conn.end();
+	}
 
 	console.log("== fetch ==");
 	const fetchCode = run("import:fetch", [
@@ -53,4 +80,12 @@ function main(): number {
 	return run("import:report", common);
 }
 
-process.exit(main());
+main().then(
+	(code) => process.exit(code),
+	(e: unknown) => {
+		console.error(
+			`import:season error: ${e instanceof Error ? e.message : String(e)}`,
+		);
+		process.exit(1);
+	},
+);

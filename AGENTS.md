@@ -16,6 +16,8 @@ Dugout is a single-user, offline Premier League football manager game. Stack: T3
 - `src/server/api/` — tRPC: routers in `routers/`, registered in @src/server/api/root.ts.
 - `src/server/db/` — Drizzle schema (@src/server/db/schema.ts) and client.
 - `src/trpc/` — client/server tRPC helpers.
+- `src/import/` — API-Football (`api-football/`) and openfootball (`openfootball/`) import stages.
+- `data/openfootball/` — verbatim CC0 copies of openfootball JSON; do not edit (refresh per `data/openfootball/README.md`).
 - `drizzle/` — committed SQL migrations; `scripts/` — thin CLI entry points.
 - `context/` — PRD, tech stack, change plans and logs. Local only: it is in `.gitignore` and not part of the public repo, so `@context/...` references resolve only in the maintainer's copy.
 
@@ -24,6 +26,7 @@ Dugout is a single-user, offline Premier League football manager game. Stack: T3
 - `./start-database.sh` — start the `dugout-postgres` container (Docker, `postgres:18`).
 - `npm run attributes:report -- --league 39 --season 2024 [--club <name>]` — player attributes and club strength vs. the final table (needs a loaded season).
 - `npm run calibration:report -- --league 39 --season 2024 [--seasons 100] [--seed 1] [--club <name|apiId>]` — simulated seasons vs. real league stats and PRD ranges, lineup test (needs a loaded season).
+- `npm run open:load [-- --league <code>]` — clubs and fixtures of 8 leagues from `data/openfootball/` (no API key; run after `import:season` for a league with real squads; idempotent).
 - `npm run dev` — dev server (Turbopack).
 - `npm run db:generate` then `npm run db:migrate` — the only way to change the schema; SQL migrations in `drizzle/` are committed. Do not use `db:push`.
 - `npx tsx scripts/<name>.ts` — run CLI scripts that import from `src/` (`tsx` resolves the `~/` alias; plain `node` does not).
@@ -32,7 +35,7 @@ Dugout is a single-user, offline Premier League football manager game. Stack: T3
 
 ## Coding Style
 
-- Biome (@biome.jsonc) enforces formatting (tabs), import sorting and Tailwind class order; `context/` and generated `drizzle/` are excluded from Biome.
+- Biome (@biome.jsonc) enforces formatting (tabs), import sorting and Tailwind class order; `context/`, generated `drizzle/` and `data/openfootball/` (verbatim copies) are excluded from Biome.
 - Import from `src` via the `~/` alias (@tsconfig.json). `noUncheckedIndexedAccess` is on — handle `undefined` from index access.
 - Every table is created through `createTable`, so names carry the `dugout_` prefix; `drizzle.config.ts` filters on it.
 

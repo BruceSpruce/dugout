@@ -1,7 +1,7 @@
 import { createTranslator } from "next-intl";
 import { describe, expect, it } from "vitest";
 
-import { AppError, appError } from "~/server/app-error";
+import { APP_ERROR_CODES, AppError, appError } from "~/server/app-error";
 import en from "../../messages/en.json";
 import pl from "../../messages/pl.json";
 import { appErrorOf, errorText } from "./error-text";
@@ -94,7 +94,7 @@ describe("errorText", () => {
 		});
 		expect(appErrorOf(serverError)).toEqual({ code: "seasonNotLoaded" });
 		expect(errorText(tPl, serverError)).toBe(
-			"Sezon nie jest załadowany — uruchom npm run import:season",
+			"Sezon nie jest załadowany — uruchom npm run open:load",
 		);
 	});
 
@@ -116,5 +116,14 @@ describe("errorText", () => {
 		expect(errorText(tPl, { data: { appError: null } }, "changeFailed")).toBe(
 			"Nie udało się wprowadzić zmiany.",
 		);
+	});
+});
+
+describe("APP_ERROR_CODES", () => {
+	it("has an errors.<code> message in pl and en for every code", () => {
+		for (const code of APP_ERROR_CODES) {
+			expect(tPl.has(`errors.${code}`), `pl ${code}`).toBe(true);
+			expect(tEn.has(`errors.${code}`), `en ${code}`).toBe(true);
+		}
 	});
 });

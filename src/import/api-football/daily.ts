@@ -18,6 +18,8 @@ export type EntryState = {
 	completedAt?: string;
 	loadedAt?: string;
 	loadExit?: number;
+	/** Set when the load was skipped because the league is already loaded from openfootball. */
+	loadBlocked?: string;
 };
 
 export type DailyState = Record<string, EntryState>;
@@ -29,6 +31,7 @@ export type EntryOutcome = {
 	missing: number;
 	status: "complete" | "partial" | "skipped";
 	loadExit?: number;
+	loadBlocked?: string;
 };
 
 export type DailyDeps = {
@@ -38,6 +41,8 @@ export type DailyDeps = {
 	fetchSeason: (o: FetchSeasonOptions) => Promise<FetchSeasonResult>;
 	/** Runs load + report for a complete entry; returns the exit code (0 ok, 3 warnings, 1 error). */
 	load: (e: QueueEntry) => Promise<number>;
+	/** Reason the load is refused (league already loaded from openfootball), else null. */
+	loadBlocked?: (e: QueueEntry) => Promise<string | null>;
 	now?: () => Date;
 };
 
@@ -57,7 +62,10 @@ export async function runDaily(
 	for (const entry of queue) {
 		const key = entryKey(entry);
 		const prev = next[key];
-		const needsLoad = entry.load && (!prev?.loadedAt || prev.loadExit === 1);
+		const needsLoad =
+			entry.load &&
+			!prev?.loadBlocked &&
+			(!prev?.loadedAt || prev.loadExit === 1);
 		if (prev?.complete && !needsLoad) {
 			outcomes.push({
 				key,
@@ -98,6 +106,15 @@ export async function runDaily(
 		const st: EntryState = { ...prev, complete };
 		if (complete && !prev?.complete) st.completedAt = now().toISOString();
 		if (complete && entry.load && needsLoad) {
+			// Raw files are kept (useful later); only the load step is skipped, once.
+			const blocked = await deps.loadBlocked?.(entry);
+			if (blocked) {
+				st.loadBlocked = blocked;
+				outcome.loadBlocked = blocked;
+				next[key] = st;
+				outcomes.push(outcome);
+				continue;
+			}
 			const code = await deps.load(entry);
 			st.loadExit = code;
 			if (code !== 1) st.loadedAt = now().toISOString();
@@ -132,7 +149,9 @@ export function statusLine(
 	const plText = pl
 		? plState?.loadedAt
 			? `${pl.name} loaded (report exit ${plState.loadExit})`
-			: `${pl.name} not loaded yet`
+			: plState?.loadBlocked
+				? `${pl.name} load skipped (already loaded from openfootball)`
+				: `${pl.name} not loaded yet`
 		: "";
 	return [
 		`daily-fetch ${at.toISOString().slice(0, 16)}Z`,

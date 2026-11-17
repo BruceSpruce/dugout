@@ -10,6 +10,9 @@ import { spawnSync } from "node:child_process";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+
 import { createClient } from "../src/import/api-football/client";
 import {
 	type DailyState,
@@ -18,6 +21,8 @@ import {
 	statusLine,
 } from "../src/import/api-football/daily";
 import { fetchSeason } from "../src/import/api-football/fetch";
+import { isApiLoadBlocked } from "../src/import/api-football/load";
+import * as schema from "../src/server/db/schema";
 
 const DATA_DIR = join(".data", "api-football");
 const STATE_FILE = join(DATA_DIR, "daily-state.json");
@@ -64,6 +69,24 @@ function loadAndReport(e: QueueEntry): Promise<number> {
 	return Promise.resolve(npm("import:report", e));
 }
 
+async function loadBlocked(e: QueueEntry): Promise<string | null> {
+	const url = process.env.DATABASE_URL;
+	if (!url) return null; // the load step reports the missing variable
+	spawnSync("docker", ["start", "dugout-postgres"], { stdio: "ignore" });
+	const conn = postgres(url);
+	try {
+		return await isApiLoadBlocked(
+			drizzle(conn, { schema }),
+			e.league,
+			e.season,
+		);
+	} catch {
+		return null; // DB down: let the load step fail and retry tomorrow
+	} finally {
+		await conn.end();
+	}
+}
+
 async function main(): Promise<number> {
 	const apiKey = process.env.API_FOOTBALL_KEY;
 	if (!apiKey) {
@@ -98,6 +121,7 @@ async function main(): Promise<number> {
 		dataDir: DATA_DIR,
 		fetchSeason,
 		load: loadAndReport,
+		loadBlocked,
 	});
 	await writeFile(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`);
 
@@ -107,7 +131,7 @@ async function main(): Promise<number> {
 		.filter((o) => o.status !== "skipped")
 		.map(
 			(o) =>
-				`${o.name}: ${o.status} req=${o.requested} missing=${o.missing}${o.loadExit === undefined ? "" : ` load/report exit=${o.loadExit}`}`,
+				`${o.name}: ${o.status} req=${o.requested} missing=${o.missing}${o.loadExit === undefined ? "" : ` load/report exit=${o.loadExit}`}${o.loadBlocked ? ` load skipped: ${o.loadBlocked}` : ""}`,
 		)
 		.join("; ");
 	await appendFile(LOG_FILE, `${line}${detail ? ` || ${detail}` : ""}\n`);

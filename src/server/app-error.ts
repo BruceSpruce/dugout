@@ -5,35 +5,52 @@
 import type { LiveChangeErrorCode } from "~/engine/live-match";
 
 /** Every error code a player can see; each one has an `errors.<code>` message. */
-export type AppErrorCode =
-	| LiveChangeErrorCode
+export const APP_ERROR_CODES = [
+	// live match changes (LiveChangeErrorCode)
+	"notCoaching",
+	"matchOver",
+	"aiInCharge",
+	"unknownFormation",
+	"subOutNotOnPitch",
+	"subInNotOnBench",
+	"subsLimit",
+	"changeNotCurrentMinute",
 	// routers
-	| "gameNotFound"
-	| "seasonNotLoaded"
-	| "seasonNotCompleted"
-	| "clubNotInSeason"
-	| "leagueNoSquads"
-	| "gameCreateFailed"
-	| "noMatchToFinish"
+	"gameNotFound",
+	"seasonNotLoaded",
+	"seasonNotCompleted",
+	"clubNotInSeason",
+	"leagueNoSquads",
+	"gameCreateFailed",
+	"noMatchToFinish",
 	// match flow
-	| "matchInProgress"
-	| "matchNotLive"
-	| "matchStillRunning"
-	| "noOwnFixture"
-	| "savedLineupInvalid"
-	| "roundMoved"
+	"matchInProgress",
+	"matchNotLive",
+	"matchStillRunning",
+	"noOwnFixture",
+	"savedLineupInvalid",
+	"roundMoved",
 	// lineup
-	| "unknownStyle"
-	| "lineupSize"
-	| "starterDuplicate"
-	| "starterNotInSquad"
-	| "benchSize"
-	| "benchDuplicate"
-	| "benchNotInSquad"
-	| "starterOnBench"
-	| "playerUnavailable"
-	| "unavailableInjury"
-	| "unavailableSuspension";
+	"unknownStyle",
+	"lineupSize",
+	"starterDuplicate",
+	"starterNotInSquad",
+	"benchSize",
+	"benchDuplicate",
+	"benchNotInSquad",
+	"starterOnBench",
+	"playerUnavailable",
+	"unavailableInjury",
+	"unavailableSuspension",
+] as const;
+
+export type AppErrorCode = (typeof APP_ERROR_CODES)[number];
+
+// Compile-time: the engine's codes are all in the list.
+type Assert<T extends true> = T;
+export type LiveCodesCovered = Assert<
+	LiveChangeErrorCode extends AppErrorCode ? true : false
+>;
 
 /** ICU params; a nested AppErrorData is translated first and passed as text. */
 export type AppErrorParams = Record<string, string | number | AppErrorData>;
