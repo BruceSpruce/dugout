@@ -126,7 +126,7 @@ export function aggregatePlayerRows(
 
 export type AttributesInput = {
 	players: PlayerInput[];
-	clubs: { clubId: number; name: string; apiId: number }[];
+	clubs: { clubId: number; name: string; apiId: number | null }[];
 	results: FixtureResult[];
 };
 
@@ -173,7 +173,7 @@ export async function loadAttributesInput(
 	const clubRows = await db.execute<{
 		club_id: number;
 		name: string;
-		api_id: number;
+		api_id: number | null;
 	}>(
 		sql`with season_clubs as (
 				select home_club_id as club_id from dugout_fixture where competition_season_id = ${id}

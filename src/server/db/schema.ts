@@ -42,7 +42,10 @@ export const competitionSeason = createTable(
 
 export const club = createTable("club", {
 	id: integer().primaryKey().generatedByDefaultAsIdentity(),
-	apiId: integer("api_id").notNull().unique(),
+	// Null for clubs loaded from openfootball only.
+	apiId: integer("api_id").unique(),
+	// "of:<slug>" key of the openfootball source; null for API-only clubs.
+	sourceKey: text("source_key").unique(),
 	name: text().notNull(),
 	code: text(),
 	country: text(),
@@ -149,7 +152,8 @@ export const fixture = createTable(
 	"fixture",
 	{
 		id: integer().primaryKey().generatedByDefaultAsIdentity(),
-		apiId: integer("api_id").notNull().unique(),
+		apiId: integer("api_id").unique(),
+		sourceKey: text("source_key").unique(),
 		competitionSeasonId: integer("competition_season_id")
 			.notNull()
 			.references(() => competitionSeason.id),

@@ -20,6 +20,7 @@
 		"db:studio": "drizzle-kit studio",
 		"dev": "next dev --turbo",
 		"import:fetch": "tsx --env-file=.env scripts/import-fetch.ts",
+		"open:load": "tsx --env-file=.env scripts/openfootball-load.ts",
 		"import:load": "tsx --env-file=.env scripts/import-load.ts",
 		"import:report": "tsx --env-file=.env scripts/import-report.ts",
 		"import:season": "tsx --env-file=.env scripts/import-season.ts",

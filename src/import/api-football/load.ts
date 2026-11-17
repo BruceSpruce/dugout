@@ -5,7 +5,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { getTableColumns, sql } from "drizzle-orm";
+import { and, count, eq, getTableColumns, isNull, sql } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
@@ -29,7 +29,7 @@ import {
 type Raw = { response?: unknown; paging?: { total?: number } };
 
 export type Db = PostgresJsDatabase<typeof schema>;
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 export type LoadSeasonOptions = {
 	db: Db;
@@ -137,11 +137,13 @@ const CHUNK = 500;
 
 // Upsert in chunks; returns id + natural-key columns of every touched row and the counts.
 // `xmax = 0` is true only for rows freshly inserted by this statement.
-async function upsert<T extends PgTable>(
+// `keep` lists columns left out of DO UPDATE SET (owned by another data source).
+export async function upsert<T extends PgTable>(
 	tx: Tx,
 	table: T,
 	values: T["$inferInsert"][],
 	target: Array<keyof T["_"]["columns"] & string>,
+	options: { keep?: string[] } = {},
 ): Promise<{ rows: Array<Record<string, unknown>>; counts: TableCounts }> {
 	const cols = getTableColumns(table) as Record<
 		string,
@@ -155,6 +157,7 @@ async function upsert<T extends PgTable>(
 	const set: Record<string, ReturnType<typeof sql.raw>> = {};
 	for (const [key, c] of Object.entries(cols)) {
 		if (c.primary || target.includes(key as never)) continue;
+		if (options.keep?.includes(key)) continue;
 		set[key] = sql.raw(`excluded."${c.name}"`);
 	}
 	const counts: TableCounts = { inserted: 0, updated: 0 };
@@ -181,15 +184,31 @@ async function upsert<T extends PgTable>(
 	return { rows, counts };
 }
 
-function idMap(rows: Array<Record<string, unknown>>, key: string) {
-	return new Map(rows.map((r) => [r[key] as number, r.id as number]));
+export function idMap<K extends number | string = number>(
+	rows: Array<Record<string, unknown>>,
+	key: string,
+) {
+	return new Map(rows.map((r) => [r[key] as K, r.id as number]));
 }
 
-function need(map: Map<number, number>, apiId: number, what: string): number {
+function need<K extends number | string>(
+	map: Map<K, number>,
+	apiId: K,
+	what: string,
+): number {
 	const id = map.get(apiId);
 	if (id === undefined)
 		throw new Error(`${what} with API id ${apiId} is not in the loaded data`);
 	return id;
+}
+
+// A league loaded from openfootball has fixtures without api_id; an API upsert on
+// ON CONFLICT (api_id) would duplicate them, so it is refused (swap of squads is S-15).
+export function apiLoadBlocked(counts: {
+	fixtures: number;
+	withoutApiId: number;
+}): boolean {
+	return counts.fixtures > 0 && counts.withoutApiId > 0;
 }
 
 export async function loadSeason(
@@ -209,6 +228,27 @@ export async function loadSeason(
 	const people = normalizePlayers(files.playerPages, league);
 
 	return db.transaction(async (tx) => {
+		const [existing] = await tx
+			.select({
+				fixtures: count(),
+				withoutApiId: count(sql`case when ${isNull(fixture.apiId)} then 1 end`),
+			})
+			.from(fixture)
+			.innerJoin(
+				competitionSeason,
+				eq(competitionSeason.id, fixture.competitionSeasonId),
+			)
+			.where(
+				and(
+					eq(competitionSeason.leagueApiId, league),
+					eq(competitionSeason.season, season),
+				),
+			);
+		if (existing && apiLoadBlocked(existing))
+			throw new Error(
+				`League ${league} season ${season} was loaded from openfootball (${existing.withoutApiId} fixtures without api_id); loading it from API-Football would duplicate clubs and fixtures. Swapping in real squads is S-15.`,
+			);
+
 		const compRes = await upsert(
 			tx,
 			competitionSeason,
@@ -221,7 +261,9 @@ export async function loadSeason(
 			"Competition",
 		);
 
-		const clubRes = await upsert(tx, club, clubs, ["apiId"]);
+		const clubRes = await upsert(tx, club, clubs, ["apiId"], {
+			keep: ["sourceKey"],
+		});
 		const clubIds = idMap(clubRes.rows, "apiId");
 
 		const playerRes = await upsert(tx, player, people.players, ["apiId"]);
@@ -261,6 +303,7 @@ export async function loadSeason(
 				awayClubId: need(clubIds, awayClubApiId, "Club"),
 			})),
 			["apiId"],
+			{ keep: ["sourceKey"] },
 		);
 
 		return {

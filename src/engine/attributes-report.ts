@@ -15,7 +15,7 @@ export type AttributesReportInput = {
 	/** Label printed in the header, e.g. "39/2024". */
 	season: string;
 	players: PlayerInput[];
-	clubs: { clubId: number; name: string; apiId: number }[];
+	clubs: { clubId: number; name: string; apiId: number | null }[];
 	results: FixtureResult[];
 };
 

@@ -15,7 +15,7 @@ type Raw = { response?: unknown };
 type Obj = Record<string, unknown>;
 
 export type CompetitionSeasonRow = typeof competitionSeason.$inferInsert;
-export type ClubRow = typeof club.$inferInsert;
+export type ClubRow = typeof club.$inferInsert & { apiId: number };
 export type PlayerRow = typeof player.$inferInsert;
 export type StatsRow = Omit<
 	typeof playerSeasonStats.$inferInsert,
