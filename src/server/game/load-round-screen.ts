@@ -7,18 +7,6 @@ import { gameLiveMatch, gameResult } from "~/server/db/schema";
 import type { LiveStatus } from "./match-flow";
 import type { RoundScreenInput } from "./round-screen";
 
-export const PREMIER_LEAGUE_API_ID = 39;
-
-/** Latest loaded season of the league (max(season)); null when none is loaded. */
-export async function latestSeasonId(db: Db): Promise<number | null> {
-	const rows = await db.execute<{ id: number }>(
-		sql`select id from dugout_competition_season
-			where league_api_id = ${PREMIER_LEAGUE_API_ID}
-			order by season desc limit 1`,
-	);
-	return rows[0]?.id ?? null;
-}
-
 /** Clubs appearing in the fixtures of a season, alphabetical. */
 export async function loadSeasonClubs(
 	db: Db,

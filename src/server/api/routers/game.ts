@@ -8,7 +8,8 @@ import {
 	publicProcedure,
 } from "~/server/api/trpc";
 import { appError } from "~/server/app-error";
-import { club, game, gameLineup } from "~/server/db/schema";
+import { club, competitionSeason, game, gameLineup } from "~/server/db/schema";
+import { loadLeagues } from "~/server/game/leagues";
 import {
 	aiProposal,
 	FORMATION_IDS,
@@ -20,7 +21,6 @@ import {
 	validateLineup,
 } from "~/server/game/lineup";
 import {
-	latestSeasonId,
 	loadRoundScreenInput,
 	loadSeasonClubs,
 } from "~/server/game/load-round-screen";
@@ -48,28 +48,44 @@ const seasonNotLoaded = () =>
 	appTRPCError("NOT_FOUND", appError("seasonNotLoaded"));
 
 export const gameRouter = createTRPCRouter({
-	clubs: publicProcedure.query(async ({ ctx }) => {
-		const seasonId = await latestSeasonId(ctx.db);
-		if (seasonId === null) {
-			throw seasonNotLoaded();
-		}
-		return loadSeasonClubs(ctx.db, seasonId);
-	}),
+	leagues: publicProcedure.query(({ ctx }) => loadLeagues(ctx.db)),
 
-	create: publicProcedure
-		.input(z.object({ clubId: id }))
-		.mutation(async ({ ctx, input }) => {
-			const seasonId = await latestSeasonId(ctx.db);
-			if (seasonId === null) {
+	clubs: publicProcedure
+		.input(z.object({ competitionSeasonId: id }))
+		.query(async ({ ctx, input }) => {
+			const [season] = await ctx.db
+				.select({ id: competitionSeason.id })
+				.from(competitionSeason)
+				.where(eq(competitionSeason.id, input.competitionSeasonId));
+			if (!season) {
 				throw seasonNotLoaded();
 			}
-			const clubs = await loadSeasonClubs(ctx.db, seasonId);
+			return loadSeasonClubs(ctx.db, season.id);
+		}),
+
+	create: publicProcedure
+		.input(z.object({ competitionSeasonId: id, clubId: id }))
+		.mutation(async ({ ctx, input }) => {
+			const leagues = await loadLeagues(ctx.db);
+			const league = leagues.find(
+				(l) => l.competitionSeasonId === input.competitionSeasonId,
+			);
+			if (!league) {
+				throw seasonNotLoaded();
+			}
+			if (!league.playable) {
+				throw appTRPCError("BAD_REQUEST", appError("leagueNoSquads"));
+			}
+			const clubs = await loadSeasonClubs(ctx.db, league.competitionSeasonId);
 			if (!clubs.some((c) => c.clubId === input.clubId)) {
 				throw appTRPCError("BAD_REQUEST", appError("clubNotInSeason"));
 			}
 			const [created] = await ctx.db
 				.insert(game)
-				.values({ competitionSeasonId: seasonId, clubId: input.clubId })
+				.values({
+					competitionSeasonId: league.competitionSeasonId,
+					clubId: input.clubId,
+				})
 				.returning({ id: game.id });
 			if (!created) {
 				throw appTRPCError(
@@ -85,12 +101,17 @@ export const gameRouter = createTRPCRouter({
 			.select({
 				gameId: game.id,
 				clubName: club.name,
+				leagueName: competitionSeason.name,
 				seasonNo: game.seasonNo,
 				currentRound: game.currentRound,
 				createdAt: game.createdAt,
 			})
 			.from(game)
 			.innerJoin(club, eq(club.id, game.clubId))
+			.innerJoin(
+				competitionSeason,
+				eq(competitionSeason.id, game.competitionSeasonId),
+			)
 			.orderBy(desc(game.createdAt), desc(game.id));
 		return rows;
 	}),

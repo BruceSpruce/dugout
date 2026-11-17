@@ -2,24 +2,12 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
 import { NewGame } from "~/app/_components/new-game";
-import { appErrorOf, errorText } from "~/i18n/error-text";
 import { api } from "~/trpc/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-	let clubs: Awaited<ReturnType<typeof api.game.clubs>> | null = null;
-	let notLoaded: string | null = null;
-	try {
-		clubs = await api.game.clubs();
-	} catch (e) {
-		// createCaller skips errorFormatter: the code is on the AppError cause.
-		if (appErrorOf(e)) {
-			notLoaded = errorText(await getTranslations(), e);
-		} else {
-			throw e;
-		}
-	}
+	const leagues = await api.game.leagues();
 	const games = await api.game.list();
 	const t = await getTranslations("home");
 
@@ -40,6 +28,7 @@ export default async function Home() {
 								>
 									{t("gameItem", {
 										club: g.clubName,
+										league: g.leagueName,
 										season: g.seasonNo,
 										round: g.currentRound,
 									})}
@@ -49,8 +38,11 @@ export default async function Home() {
 					</ul>
 				</section>
 			) : null}
-			{clubs ? <NewGame clubs={clubs} /> : null}
-			{notLoaded ? <p className="text-red-300">{notLoaded}</p> : null}
+			{leagues.length > 0 ? (
+				<NewGame leagues={leagues} />
+			) : (
+				<p className="text-red-300">{t("noLeagues")}</p>
+			)}
 		</main>
 	);
 }

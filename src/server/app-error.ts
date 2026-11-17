@@ -12,6 +12,7 @@ export type AppErrorCode =
 	| "seasonNotLoaded"
 	| "seasonNotCompleted"
 	| "clubNotInSeason"
+	| "leagueNoSquads"
 	| "gameCreateFailed"
 	| "noMatchToFinish"
 	// match flow

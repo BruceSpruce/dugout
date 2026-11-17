@@ -27,9 +27,12 @@ cp .env.example .env              # set API_FOOTBALL_KEY; DATABASE_URL works wit
 ./start-database.sh               # starts the dugout-postgres container (answer y to generate a password)
 npm install
 npm run db:migrate
-npm run import:season -- --league 39 --season 2024
+npm run open:load                 # clubs and fixtures of 8 leagues from openfootball, no API key needed
+npm run import:season -- --league 39 --season 2024   # real squads for one league (needs your API key)
 npm run dev                       # http://localhost:3000
 ```
+
+A league is playable only when its clubs have squads. After `open:load` the leagues without squads show up in the new-game screen but cannot be started yet (fictional squads come next); `import:season` loads real squads for a league with your own API key.
 
 A full league season needs more requests than the free daily quota. `import:season` stops with exit code 2 when the budget runs out. Run it again the next day and it continues where it stopped.
 
@@ -50,6 +53,7 @@ You can also run it by hand: `npm run daily:fetch`.
 | --------------------------------------------------------- | ------------------------------------------------------ |
 | `npm run dev`                                             | Development server                                     |
 | `npm run build` / `npm start`                             | Production build and server                            |
+| `npm run open:load`                                       | Load clubs and fixtures of 8 leagues from openfootball |
 | `npm run import:season -- --league <id> --season <year>`  | Download, load and check one league season             |
 | `npm run import:fetch` / `import:load` / `import:report`  | The same import, stage by stage                        |
 | `npm run calibration:report -- --league 39 --season 2024` | Simulated seasons compared with real league statistics |
@@ -71,7 +75,7 @@ Next.js 15 (App Router), tRPC 11, Drizzle ORM, PostgreSQL 18, Tailwind CSS 4, ne
 
 ## Data
 
-Club, player and fixture data come from API-Football and are **not** included in this repository. Everyone downloads them with their own key into the local `.data/` folder and database, under API-Football's terms of use. The test fixtures in `src/import/api-football/__fixtures__/` are invented and only mimic the shape of API responses.
+Clubs and fixtures of 8 leagues for 2024/25 come from [openfootball](https://github.com/openfootball/football.json) (CC0, public domain) and are included in `data/openfootball`. Player data and squads come from API-Football and are **not** included in this repository. Everyone downloads them with their own key into the local `.data/` folder and database, under API-Football's terms of use. The test fixtures in `src/import/api-football/__fixtures__/` are invented and only mimic the shape of API responses.
 
 This is a fan project, not affiliated with any league, club or data provider.
 

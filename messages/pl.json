@@ -33,6 +33,7 @@
 		"seasonNotLoaded": "Sezon nie jest załadowany — uruchom npm run import:season",
 		"seasonNotCompleted": "Ten sezon się jeszcze nie zakończył.",
 		"clubNotInSeason": "Ten klub nie gra w załadowanym sezonie.",
+		"leagueNoSquads": "Ta liga nie ma jeszcze kadr — nie można w niej zacząć gry.",
 		"gameCreateFailed": "Nie udało się utworzyć gry.",
 		"noMatchToFinish": "Nie ma meczu do zakończenia (mecz nie trwa albo nie doszedł do 90. minuty).",
 		"matchInProgress": "Mecz już trwa.",
@@ -125,8 +126,15 @@
 	},
 	"home": {
 		"yourGames": "Twoje gry",
-		"gameItem": "{club} — sezon {season}, kolejka {round}",
-		"newGame": "Nowa gra"
+		"gameItem": "{club} — {league}, sezon {season}, kolejka {round}",
+		"newGame": "Nowa gra",
+		"chooseLeague": "Wybierz ligę",
+		"chooseClub": "Wybierz klub",
+		"changeLeague": "Zmień ligę",
+		"leagueInfo": "{country} · {clubs, plural, one {# klub} few {# kluby} many {# klubów} other {# klubu}}",
+		"squadsSoon": "kadry w przygotowaniu",
+		"loadingClubs": "Ładowanie klubów…",
+		"noLeagues": "Brak lig w bazie — uruchom npm run open:load"
 	},
 	"round": {
 		"backToGames": "← Gry",

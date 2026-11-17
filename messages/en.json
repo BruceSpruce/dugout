@@ -33,6 +33,7 @@
 		"seasonNotLoaded": "The season is not loaded — run npm run import:season",
 		"seasonNotCompleted": "This season has not finished yet.",
 		"clubNotInSeason": "This club does not play in the loaded season.",
+		"leagueNoSquads": "This league has no squads yet, so a game cannot be started in it.",
 		"gameCreateFailed": "Could not create the game.",
 		"noMatchToFinish": "There is no match to finish (no match is live or it has not reached minute 90).",
 		"matchInProgress": "A match is already in progress.",
@@ -125,8 +126,15 @@
 	},
 	"home": {
 		"yourGames": "Your games",
-		"gameItem": "{club} — season {season}, round {round}",
-		"newGame": "New game"
+		"gameItem": "{club} — {league}, season {season}, round {round}",
+		"newGame": "New game",
+		"chooseLeague": "Choose a league",
+		"chooseClub": "Choose a club",
+		"changeLeague": "Change league",
+		"leagueInfo": "{country} · {clubs, plural, one {# club} other {# clubs}}",
+		"squadsSoon": "squads coming soon",
+		"loadingClubs": "Loading clubs…",
+		"noLeagues": "No leagues in the database — run npm run open:load"
 	},
 	"round": {
 		"backToGames": "← Games",
